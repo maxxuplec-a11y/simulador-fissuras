@@ -1,0 +1,2447 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Simulador Visual de Fissuras</title>
+<style>
+  :root{
+    --bg:#e9ebee; --panel:#f8f8f7; --ink:#22262b; --muted:#6b7178; --line:#d9dcdf;
+    --accent:#2f6fd6; --accent-soft:#e3ecfa; --warn:#b4472f; --chip:#eef0f2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{height:52px;display:flex;align-items:center;gap:12px;padding:0 16px;
+    background:#fff;border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.1px}
+  header .sub{color:var(--muted);font-size:12.5px}
+  header .sp{flex:1}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);
+    border-radius:7px;padding:6px 11px}
+  button:hover{border-color:#b9bec4;background:#fafafa}
+  button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  button.primary:hover{background:#3a4047}
+  header button{white-space:nowrap}
+  button[disabled]{opacity:.5;cursor:default}
+  /* modo de edição */
+  #viewport #plan{position:absolute;inset:0;width:100%;height:100%;display:none;touch-action:none}
+  #edbar{position:absolute;top:10px;left:10px;right:10px;display:none;flex-wrap:wrap;gap:6px;align-items:center;pointer-events:none}
+  #edbar>*{pointer-events:auto}
+  #edbar button{padding:4px 9px;font-size:12.5px}
+  #edbar .seg{display:flex}
+  #edbar .seg button{border-radius:0} #edbar .seg button:first-child{border-radius:7px 0 0 7px} #edbar .seg button:last-child{border-radius:0 7px 7px 0;margin-left:-1px}
+  #edbar .tools{display:flex;flex-wrap:wrap;gap:2px;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:8px;padding:3px}
+  #edbar .tools button{border-color:transparent;background:transparent}
+  #edbar .tools button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  #edbar select{font-size:12.5px;padding:4px 6px}
+  #edhint{position:absolute;left:12px;bottom:12px;right:12px;display:none;background:rgba(255,255,255,.92);border:1px solid var(--line);
+    border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted);width:max-content;max-width:calc(100% - 24px)}
+  #edhint.flash{color:var(--warn);border-color:#e3c3bb}
+  body.editing #edbar{display:flex} body.editing #edhint{display:block} body.editing #help{display:none}
+  body.editing.planta #viewport #plan{display:block}
+  body.editing .sim-only{display:none} body:not(.editing) .edit-only{display:none}
+  .form{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:13px;margin-bottom:10px}
+  .form span{color:var(--muted)}
+  .form input,.form select{font:inherit;width:100%;min-width:0;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
+  .btnrow{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px} .btnrow button{font-size:12.5px;padding:5px 9px}
+  button.danger{color:var(--warn);border-color:#e3c3bb}
+  .oplist{display:flex;flex-direction:column;gap:4px;margin-bottom:4px} .oplist button{text-align:left;font-size:12.5px;padding:5px 9px}
+  @media (max-width:1100px){ header .sub{display:none} }
+  button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  #toast{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);color:var(--ink);font-size:13px;font-weight:600;
+    padding:5px 10px;border-radius:7px;box-shadow:0 2px 10px rgba(0,0,0,.12);transform:translate(14px,-34px);display:none;white-space:nowrap}
+  #app{position:absolute;top:52px;left:0;right:0;bottom:0;display:flex}
+  #viewport{position:relative;flex:1;min-width:0}
+  #viewport canvas{display:block;width:100%;height:100%;outline:none}
+  #tip{position:absolute;pointer-events:none;background:rgba(34,38,43,.9);color:#fff;
+    font-size:12px;padding:3px 8px;border-radius:5px;transform:translate(12px,12px);display:none;white-space:nowrap}
+  #help{position:absolute;left:12px;bottom:12px;background:rgba(255,255,255,.88);border:1px solid var(--line);
+    border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted)}
+  #err{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--warn)}
+  aside{width:350px;flex:none;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto}
+  aside section{padding:14px 16px;border-bottom:1px solid var(--line)}
+  aside h3{margin:0 0 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:650}
+  .selhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .selhead h2{margin:0;font-size:18px;flex:1}
+  .tag{font-size:11px;font-weight:650;background:var(--accent-soft);color:var(--accent);padding:2px 7px;border-radius:999px}
+  .x{border:none;background:none;font-size:18px;color:var(--muted);padding:0 4px}
+  dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0 0 12px;font-size:13px}
+  dt{color:var(--muted)} dd{margin:0}
+  .actions{display:flex;flex-direction:column;gap:6px}
+  .act{text-align:left;display:flex;align-items:center;gap:8px;padding:8px 10px}
+  .act .dot{width:9px;height:9px;border-radius:50%;border:1.5px solid #9aa0a6;flex:none}
+  .act.on{border-color:var(--accent);background:var(--accent-soft)}
+  .act.on .dot{background:var(--accent);border-color:var(--accent)}
+  .act[disabled]{opacity:.55;cursor:default;background:#fff}
+  .act .badge{margin-left:auto;font-size:10.5px;color:var(--muted);background:var(--chip);padding:1px 6px;border-radius:999px}
+  .hint{color:var(--muted);font-size:13px}
+  .hint b{color:var(--ink)}
+  .note{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+  .toggle{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:7px 10px}
+  .chips{display:flex;flex-direction:column;gap:6px}
+  .chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:13px}
+  .chip span{flex:1} .chip small{color:var(--muted)}
+  .chip button{border:none;padding:0 4px;font-size:16px;color:var(--muted);background:none}
+  .row{display:flex;align-items:center;gap:10px;margin:6px 0}
+  .row label{flex:1}
+  .row input[type=range]{flex:1.4}
+  .scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:-4px}
+  .checks label{display:flex;align-items:center;gap:8px;margin:4px 0}
+  .checks label.dis{color:var(--muted)}
+  .checks label small{color:var(--muted)}
+  select{font:inherit;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff}
+  .legend{background:#fff;border:1px solid var(--line);border-left:3px solid var(--ink);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:13px}
+  .legend b{display:block;margin-bottom:3px}
+  .legend p{margin:3px 0} .legend em{font-style:normal;color:var(--muted)}
+  .empty{color:var(--muted);font-size:13px}
+  input[type=file]{display:none}
+  @media (max-width:760px){
+    #app{flex-direction:column} aside{width:auto;height:45%;border-left:none;border-top:1px solid var(--line)}
+    header .sub{display:none}
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header>
+  <h1>Simulador Visual de Fissuras</h1>
+  <span class="sub">Vistorias e treinamentos · visual, sem cálculo estrutural</span>
+  <span class="sp"></span>
+  <button id="bEdit" title="Desenhar ou alterar a estrutura (planta e 3D)">Editar modelo</button>
+  <button id="bKnock" title="Ligado: clicar numa peça cerâmica toca o som da percussão e marca a peça">Teste de percussão</button>
+  <button id="bReset" class="primary" title="Remove todos os cenários aplicados">Resetar cenários</button>
+  <button id="bView" title="Volta a câmera para a vista inicial">Vista inicial</button>
+  <button id="bOpen">Abrir JSON</button>
+  <button id="bSave">Salvar JSON</button>
+  <input type="file" id="fileIn" accept=".json,application/json">
+</header>
+<div id="app">
+  <div id="viewport">
+    <canvas id="plan"></canvas>
+    <div id="edbar">
+      <div class="seg"><button data-view="planta">Planta</button><button data-view="3d">3D</button></div>
+      <select id="edLevel" title="Pavimento em edição"></select>
+      <div class="tools">
+        <button data-tool="select" title="Selecionar, mover e redimensionar (V)">Selecionar</button>
+        <button data-tool="column" title="Inserir pilar (P)">Pilar</button>
+        <button data-tool="beam" title="Desenhar viga (B)">Viga</button>
+        <button data-tool="wall" title="Desenhar parede (W)">Parede</button>
+        <button data-tool="slab" title="Desenhar laje (L)">Laje</button>
+        <button data-tool="cantilever" title="Desenhar balanço (K)">Balanço</button>
+        <button data-tool="piso" title="Desenhar piso cerâmico (F)">Piso</button>
+        <button data-tool="porta" title="Inserir porta numa parede (D)">Porta</button>
+        <button data-tool="janela" title="Inserir janela numa parede (J)">Janela</button>
+        <button data-tool="delete" title="Apagar elemento (X)">Apagar</button>
+      </div>
+    </div>
+    <div id="edhint"></div>
+    <div id="tip"></div>
+    <div id="toast"></div>
+    <div id="help">Arraste para girar · botão direito para mover · roda para zoom · clique num elemento</div>
+    <div id="err"></div>
+  </div>
+  <aside id="panel">
+    <section id="editBox" class="edit-only"></section>
+    <section id="selBox" class="sim-only"></section>
+    <section class="sim-only"><h3>Cenários ativos</h3><div id="scenList"></div></section>
+    <section class="sim-only">
+      <h3>Controles</h3>
+      <div class="row"><label for="rInt">Intensidade</label><input id="rInt" type="range" min="0" max="1" step="0.01" value="0.6"></div>
+      <div class="scale"><span></span><span>leve&nbsp;&nbsp;·&nbsp;&nbsp;moderada&nbsp;&nbsp;·&nbsp;&nbsp;severa</span></div>
+      <div class="row"><label for="rExag">Exagero da deformada</label><input id="rExag" type="range" min="0" max="3" step="0.05" value="1"></div>
+      <div class="scale"><span></span><span>0× ··················· 3×</span></div>
+    </section>
+    <section class="checks">
+      <h3>Vínculos</h3>
+      <label><input type="radio" name="vinc" value="hiperestatica" checked> Hiperestática <small>· ligações rígidas, vigas contínuas</small></label>
+      <label><input type="radio" name="vinc" value="isostatica"> Isostática <small>· vigas biapoiadas, ligações articuladas</small></label>
+      <p class="note" id="vincNote"></p>
+    </section>
+    <section class="checks">
+      <h3>Camadas</h3>
+      <label><input type="checkbox" id="cEst" checked> Estrutura (pilares, vigas, lajes)</label>
+      <label><input type="checkbox" id="cAlv" checked> Alvenaria</label>
+      <label><input type="checkbox" id="cReb" checked> Reboco</label>
+      <label><input type="checkbox" id="cUmi"> Umidade / infiltração nas fissuras</label>
+      <label><input type="checkbox" id="cCer" checked> Cerâmica <small>· piso e paredes revestidas</small></label>
+    </section>
+    <section class="checks">
+      <h3>Corte</h3>
+      <label><input type="checkbox" id="cCut"> Ativar plano de corte</label>
+      <div class="row"><label for="sAxis">Direção</label>
+        <select id="sAxis"><option value="z">Transversal (Z)</option><option value="x">Longitudinal (X)</option><option value="y">Horizontal (planta)</option></select></div>
+      <div class="row"><label for="rCut">Posição</label><input id="rCut" type="range" min="0" max="1" step="0.005" value="0.5"></div>
+    </section>
+    <section class="sim-only"><h3>Legenda</h3><div id="legend"></div></section>
+  </aside>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ---------- utilidades ---------- */
+const $ = s => document.querySelector(s);
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hashStr(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function distPointSeg(px, pz, x1, z1, x2, z2) {
+  const dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz || 1e-9;
+  const t = clamp(((px - x1) * dx + (pz - z1) * dz) / l2, 0, 1);
+  return Math.hypot(px - x1 - t * dx, pz - z1 - t * dz);
+}
+const fmt = (x, d = 2) => x.toFixed(d).replace('.', ',');
+const PI = Math.PI;
+
+/* ---------- textos ---------- */
+const TYPE_LABEL = { column: 'Pilar', beam: 'Viga', slab: 'Laje', cantilever: 'Balanço', wall: 'Alvenaria', floor: 'Piso' };
+const SCEN = {
+  recalque: {
+    label: 'Recalque de fundação', targets: ['column'], action: 'Recalcar fundação',
+    causa: 'Assentamento diferencial do solo sob a fundação deste pilar: solo compressível ou aterro mal compactado, variação de umidade, fundação subdimensionada, escavação ou rebaixamento de lençol vizinho.',
+    config: 'Fissuras inclinadas (~45°) nos panos de alvenaria, subindo em direção ao apoio que recalcou. Concentram-se nos cantos das aberturas e costumam aparecer nos dois pavimentos.'
+  },
+  esmagamento: {
+    label: 'Esmagamento de pilar', targets: ['column'], action: 'Comprimir até esmagar',
+    causa: 'Compressão acima da resistência: sobrecarga, concreto de baixa resistência ou mal adensado, seção ou armadura insuficientes, estribos muito espaçados.',
+    config: 'Feixe de fissuras verticais (paralelas à carga) no trecho mais solicitado, lascamento do concreto nas quinas e barras flambadas expostas. O pilar encurta e o que está acima desce, fissurando as alvenarias vizinhas.'
+  },
+  tracao: {
+    label: 'Pilar tracionado', targets: ['column'], action: 'Tracionar (pilar pendurado)',
+    causa: 'Inversão do caminho das cargas: a fundação perdeu apoio ou o pilar foi alterado no pavimento inferior, e ele passa a ficar "pendurado" nas vigas superiores, trabalhando à tração em vez de compressão.',
+    config: 'Fissuras horizontais, aproximadamente paralelas e regularmente espaçadas, atravessando toda a seção e contornando as quatro faces; pode surgir separação entre pilar e fundação.'
+  },
+  corrosao: {
+    label: 'Corrosão de armadura', targets: ['column', 'beam'], action: 'Corrosão de armadura',
+    causa: 'Perda da proteção do aço: cobrimento insuficiente, concreto poroso ou fissurado, carbonatação ou cloretos (umidade, maresia). O óxido ocupa mais volume que o aço e rompe o cobrimento.',
+    config: 'Fissuras paralelas às barras (longitudinais na face inferior das vigas, verticais nas quinas dos pilares), manchas de ferrugem e desplacamento do cobrimento com armadura exposta.'
+  },
+  flexao: {
+    label: 'Flexão em viga', targets: ['beam'], action: 'Flexão (sobrecarga)',
+    causa: 'Carga acima da prevista, armadura de flexão insuficiente ou mal posicionada, vão excessivo ou retirada precoce do escoramento.',
+    config: 'Fissuras verticais no meio do vão, partindo da face tracionada (inferior) e fechando em direção à linha neutra; acompanhadas de flecha visível. Em vigas contínuas surgem também fissuras na face superior junto aos apoios.'
+  },
+  cisalhamento: {
+    label: 'Cisalhamento em viga', targets: ['beam'], action: 'Cisalhamento (esforço cortante)',
+    causa: 'Esforço cortante acima da capacidade: estribos insuficientes ou mal ancorados, carga concentrada próxima ao apoio, concreto de baixa resistência.',
+    config: 'Fissuras inclinadas (~45°) junto aos apoios, subindo da face inferior em direção ao pilar. Ruptura frágil: requer atenção imediata.'
+  },
+  torcao: {
+    label: 'Torção em viga', targets: ['beam'], action: 'Torção',
+    causa: 'Momento de torção não considerado ou com armadura insuficiente (estribos fechados e barras longitudinais): vigas que recebem lajes em balanço, marquises ou cargas excêntricas.',
+    config: 'Fissuras helicoidais a ~45° que contornam a viga, com inclinações opostas em faces opostas e em cada metade do vão; mais abertas junto aos apoios.'
+  },
+  balanco: {
+    label: 'Flecha excessiva em balanço', targets: ['cantilever'], action: 'Flecha excessiva',
+    causa: 'Armadura negativa (superior) insuficiente, mal ancorada ou rebaixada durante a concretagem, vão excessivo, sobrecarga ou retirada precoce do escoramento.',
+    config: 'Extremidade livre visivelmente abaixada e fissuras na face superior junto ao engaste, paralelas à linha de apoio, podendo avançar para o piso interno.'
+  },
+  expansao: {
+    label: 'Expansão térmica da laje', targets: ['slab'], action: 'Expansão térmica (insolação)', level: true,
+    causa: 'Dilatação da laje exposta ao sol (principalmente a de cobertura) sem isolamento térmico ou junta de dilatação; a laje se movimenta mais que as paredes que a apoiam.',
+    config: 'Fissura horizontal no topo das paredes, logo abaixo da laje, e fissuras inclinadas nos cantos superiores, perto das extremidades. Afeta todo o nível da laje.'
+  },
+  retracao: {
+    label: 'Retração da laje', targets: ['slab'], action: 'Retração (secagem do concreto)', level: true,
+    causa: 'Perda de água do concreto nas primeiras semanas (cura deficiente, excesso de água, alto consumo de cimento) sem juntas ou armadura de distribuição suficiente; a laje encurta e puxa o topo das paredes.',
+    config: 'Fissuras transversais atravessando a laje, aproximadamente paralelas ao menor vão; fissura horizontal no topo das paredes e inclinadas nos cantos, com inclinação oposta à da expansão.'
+  },
+  escalonada: {
+    label: 'Fissuras escalonadas', targets: ['wall'], action: 'Distorção do pano (escalonadas)',
+    causa: 'Cisalhamento ou distorção do pano de alvenaria: recalques, deformação da estrutura, cargas concentradas ou movimentação térmica, com argamassa de assentamento mais fraca que os blocos.',
+    config: 'Fissuras "em escada", percorrendo as juntas horizontais e verticais de assentamento, em geral com inclinação média de ~45°; no reboco aparecem como linhas serrilhadas.'
+  },
+  horizontal: {
+    label: 'Fissuras horizontais nas juntas', targets: ['wall'], action: 'Fissuras horizontais nas juntas',
+    causa: 'Expansão da argamassa de assentamento (hidratação retardada da cal, ataque por sulfatos), sobrecarga excêntrica ou flexão da parede, retração da argamassa ou umidade ascensional na base.',
+    config: 'Fissuras contínuas ao longo das juntas horizontais, em uma ou várias fiadas, frequentemente no terço superior ou próximas à base; podem vir com estufamento do reboco.'
+  },
+  verga: {
+    label: 'Falha de verga / contraverga', targets: ['wall'], action: 'Falha de verga / contraverga', needsOpening: true,
+    causa: 'Verga e contraverga ausentes, curtas (transpasse menor que ~30 cm de cada lado da abertura) ou subdimensionadas: as tensões se concentram nos cantos das aberturas.',
+    config: 'Fissuras inclinadas partindo dos cantos superiores (acima de portas e janelas) e dos inferiores (abaixo das janelas), avançando para fora da abertura. Sem reboco, a verga curta fica à mostra.'
+  },
+  interface: {
+    label: 'Encontro pilar–alvenaria', targets: ['wall'], action: 'Movimentação pilar × alvenaria',
+    causa: 'Concreto e alvenaria se deformam de modo diferente (retração, temperatura, carga). Sem tela ou ferro-cabelo, a ligação depende só da argamassa, que não acompanha o movimento.',
+    config: 'Sem tela/ferro-cabelo: fissura vertical contínua no encontro do pilar com a parede, em toda a altura. Com tela: o movimento se distribui em microfissuras curtas e pouco visíveis.'
+  },
+  encunhamento: {
+    label: 'Falha de encunhamento', targets: ['wall'], action: 'Falha de encunhamento',
+    causa: 'Fixação superior da parede feita cedo demais (antes da acomodação da estrutura), com argamassa retrátil ou material inadequado, ou deformação da viga/laje acima.',
+    config: 'Fissura horizontal contínua no topo da parede, no encontro com a viga ou laje, às vezes com destacamento visível.'
+  },
+  mapeada: {
+    label: 'Fissuras mapeadas (pele de crocodilo)', targets: ['wall'], action: 'Fissuras mapeadas (reboco)',
+    causa: 'Retração da argamassa de revestimento rica em cimento ou em finos, excesso de desempeno, camada muito espessa ou secagem rápida (sol, vento) sem cura.',
+    config: 'Rede de fissuras finas formando polígonos irregulares, como pele de crocodilo, em áreas do reboco; não acompanham o desenho da alvenaria. Visível com o reboco ligado.'
+  },
+  retracaoReboco: {
+    label: 'Retração do revestimento', targets: ['wall'], action: 'Retração do revestimento',
+    causa: 'Retração da argamassa sobre base de absorção desigual (blocos e juntas absorvem água de modo diferente), chapisco ausente ou irregular, espessura excessiva numa só demão.',
+    config: 'Fissuras finas que reproduzem as juntas da alvenaria por baixo do reboco (horizontais contínuas e verticais alternadas), às vezes com som cavo. Visível com o reboco ligado.'
+  },
+  ceramicaFissura: {
+    label: 'Fissuras nas peças cerâmicas', targets: ['wall', 'floor'], action: 'Fissuras nas peças cerâmicas', needsCeramic: true,
+    causa: 'Movimentação da base (fissura na alvenaria, laje ou contrapiso), falta de juntas de movimentação, impacto ou peças de baixa resistência.',
+    config: 'Trincas atravessando as peças, muitas vezes alinhadas com uma fissura da base e continuando de peça em peça; algumas peças isoladas trincadas a partir dos cantos.'
+  },
+  descolamento: {
+    label: 'Descolamento / desplacamento', targets: ['wall', 'floor'], action: 'Descolamento por fissura na base', needsCeramic: true,
+    causa: 'Fissura ou movimentação da base (alvenaria ou laje) somada à retração e à dilatação do revestimento sem juntas de movimentação; argamassa colante vencida ou mal aplicada.',
+    config: 'Peças soltas ao longo da fissura da base: no piso, estufamento em "telhado" com peças levantadas; na parede, peças com som cavo e desplacamento, deixando a argamassa à mostra.'
+  },
+  pisoOco: {
+    label: 'Piso oco (falha de assentamento)', targets: ['floor'], action: 'Falha de assentamento (piso oco)',
+    causa: 'Argamassa colante sem dupla colagem, cordões não amassados, tempo em aberto vencido ou base suja/empoeirada: ficam vazios sob as peças.',
+    config: 'O piso parece normal; o teste de percussão revela som cavo. Desligue a camada Cerâmica ou use o corte horizontal (posição baixa) para ver os vazios na argamassa.'
+  },
+  recorte: {
+    label: 'Fissura no canto do recorte', targets: ['floor'], action: 'Fissura no canto do recorte',
+    causa: 'Peça recortada em "L" ou com entalhe (em torno de pilares, ralos, soleiras): o canto vivo concentra tensões e a peça trinca com a movimentação ou o impacto.',
+    config: 'Trinca partindo do canto interno do recorte, em diagonal, até a borda da peça.'
+  }
+};
+const PERCUSSAO = {
+  label: 'Teste de percussão',
+  causa: 'Bater levemente na peça com martelo de borracha ou cabo de ferramenta e ouvir o som.',
+  config: 'Som cheio e seco: peça aderida (marcada com círculo verde). Som cavo, mais grave e prolongado: vazio sob a peça ou descolamento (marcada com X vermelho).'
+};
+const INFILTRACAO = {
+  label: 'Infiltração pelas fissuras',
+  causa: 'Fissuras passantes e cantos de janelas (sem contraverga, peitoril sem pingadeira ou caimento) deixam a água de chuva atravessar a parede.',
+  config: 'Manchas de umidade, bolor e descascamento da pintura ao redor e abaixo das fissuras, mais intensas sob os cantos das janelas e na face interna.'
+};
+const FUTURE = {};
+const VINC_NOTE = {
+  hiperestatica: 'Os esforços se redistribuem entre os elementos: recalques e flechas ficam menores e mais espalhados, e vigas fletidas fissuram também na face superior junto aos apoios (momento negativo).',
+  isostatica: 'Sem redistribuição: cada viga trabalha sozinha. Flechas maiores, fissuras de flexão concentradas no meio do vão e recalques com distorção mais localizada, abrindo mais as fissuras perto do apoio.'
+};
+const floorName = l => l === 0 ? 'Térreo' : `${l}º pavimento`;
+
+/* ---------- modelo exemplo: sobrado 2 pavimentos ---------- */
+function exampleModel() {
+  const pd = 2.8, xs = [0, 4, 8], zs = [0, 3, 6];
+  const columns = [], beams = [], slabs = [], walls = [];
+  let k = 1;
+  for (const z of zs) for (const x of xs) columns.push({ id: `P${k++}`, x, z, b: 0.2, h: 0.2 });
+  for (let level = 0; level <= 2; level++) {
+    let n = 1; const h = level === 0 ? 0.3 : 0.4;
+    for (const z of zs) for (let i = 0; i < 2; i++) beams.push({ id: `V${level}-${String(n++).padStart(2, '0')}`, level, x1: xs[i], z1: z, x2: xs[i + 1], z2: z, b: 0.15, h });
+    for (const x of xs) for (let i = 0; i < 2; i++) beams.push({ id: `V${level}-${String(n++).padStart(2, '0')}`, level, x1: x, z1: zs[i], x2: x, z2: zs[i + 1], b: 0.15, h });
+  }
+  for (let level = 1; level <= 2; level++) {
+    let n = 1;
+    for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++)
+      slabs.push({ id: `L${level}-${n++}`, level, kind: 'laje', x0: xs[i], z0: zs[j], x1: xs[i + 1], z1: zs[j + 1], t: 0.12 });
+  }
+  slabs.push({ id: 'B1-1', level: 1, kind: 'balanco', x0: 4.1, z0: -1.2, x1: 7.9, z1: 0, t: 0.12 });
+  const P = (pos, w = 0.8) => ({ type: 'porta', pos, width: w, height: 2.1, sill: 0 });
+  const J = pos => ({ type: 'janela', pos, width: 1.2, height: 1.0, sill: 1.1 });
+  const W = (level, x1, z1, x2, z2, openings = []) => walls.push({ id: `A${level}-${String(walls.filter(w => w.level === level).length + 1).padStart(2, '0')}`, level, x1, z1, x2, z2, t: 0.15, openings });
+  W(0, 0, 0, 4, 0, [P(1.6)]); W(0, 4, 0, 8, 0, [J(1.4)]); W(0, 0, 6, 4, 6, [J(1.4)]); W(0, 4, 6, 8, 6, [P(2.0)]);
+  W(0, 0, 0, 0, 3, [J(0.9)]); W(0, 0, 3, 0, 6); W(0, 8, 0, 8, 3); W(0, 8, 3, 8, 6, [J(0.9)]);
+  W(0, 4, 0, 4, 3, [P(1.1)]); W(0, 0, 3, 4, 3);
+  W(1, 0, 0, 4, 0, [J(1.4)]); W(1, 4, 0, 8, 0, [P(1.5, 1.0)]); W(1, 0, 6, 4, 6, [J(1.4)]); W(1, 4, 6, 8, 6, [J(1.4)]);
+  W(1, 0, 0, 0, 3, [J(0.9)]); W(1, 0, 3, 0, 6); W(1, 8, 0, 8, 3); W(1, 8, 3, 8, 6, [J(0.9)]);
+  W(1, 4, 3, 4, 6, [P(1.0)]); W(1, 4, 3, 8, 3);
+  for (const id of ['A0-05', 'A0-06']) walls.find(w => w.id === id).ceramica = true;   // fachada lateral revestida
+  return {
+    name: 'Sobrado exemplo (2 pavimentos)', floors: 2, pd, vinculo: 'hiperestatica',
+    columns, beams, slabs, walls, pisos: [{ id: 'PS-1', x0: 0, z0: 0, x1: 8, z1: 6 }]
+  };
+}
+
+/* ---------- estado ---------- */
+const state = {
+  model: null, scen: [], sel: null, hover: null,
+  intensity: 0.6, exag: 1,
+  layers: { estrutura: true, alvenaria: true, reboco: true, umidade: false, ceramica: true },
+  percussao: false, marks: new Map(),   // marcas do teste de percussão: "id|i|j" → 'cavo' | 'cheio'
+  cut: { on: false, axis: 'z', frac: 0.5 }
+};
+let scenSeq = 0;
+const entries = new Map();
+let colMap = new Map(), beamInfo = new Map(), cantInfo = new Map(), bounds = null;
+let crackedIds = new Set();
+let needDeform = true;
+const CRUSH_Y0 = 0.7, CRUSH_Y1 = 1.7;   // trecho do pilar do térreo que esmaga (m)
+
+/* ---------- three.js ---------- */
+const vp = $('#viewport');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
+catch (e) { $('#err').style.display = 'flex'; $('#err').textContent = 'Não foi possível iniciar o WebGL neste navegador.'; throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.localClippingEnabled = true;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+vp.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#e9ebee');
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 300);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI * 0.93; controls.minDistance = 1; controls.maxDistance = 80;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9a958c, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 1.7);
+sun.position.set(-10, 16, -9);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 60 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+scene.add(sun, sun.target);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80),
+  new THREE.MeshStandardMaterial({ color: '#dcd8cf', transparent: true, opacity: 0.72, depthWrite: false, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.012; ground.receiveShadow = true;
+scene.add(ground);
+const grid = new THREE.GridHelper(40, 40, 0xb3ada2, 0xc9c4ba);
+grid.position.y = -0.008; grid.material.transparent = true; grid.material.opacity = 0.45;
+scene.add(grid);
+
+const root = new THREE.Group(); scene.add(root);
+const indicators = new THREE.Group(); scene.add(indicators);
+const cutPlane = new THREE.Plane(V3(0, 0, 1), 0);
+const anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+/* ---------- geometria de painel (caixa subdividida, com aberturas) ---------- */
+// Coordenadas locais: u ao longo do comprimento L, v ao longo da altura H, w na espessura T.
+// Faces: 0 frente (+w), 1 fundo (-w), 2 lado u=0, 3 lado u=L, 4 base v=0, 5 topo v=H.
+// Layout da textura:
+//   'shared' – todas as faces usam a mesma imagem (alvenaria: fissura passante aparece nos dois lados);
+//   'two'    – metade de cima da imagem para a face 0, metade de baixo para a face 1 (vigas, lajes);
+//   'four'   – quatro faixas verticais, uma por face lateral (pilares).
+function panelGeometry(L, H, T, openings, cell, layout) {
+  const brk = (len, extra) => {
+    const a = [0, len];
+    for (let x = cell; x < len - 1e-4; x += cell) a.push(x);
+    for (const x of extra) if (x > 0 && x < len) a.push(x);
+    a.sort((p, q) => p - q);
+    const r = [a[0]];
+    for (const x of a) if (x - r[r.length - 1] > 1e-3) r.push(x);
+    r[r.length - 1] = len;
+    return r;
+  };
+  const us = brk(L, openings.flatMap(o => [o.u0, o.u1]));
+  const vs = brk(H, openings.flatMap(o => [o.v0, o.v1]));
+  const nu = us.length - 1, nv = vs.length - 1;
+  const solid = new Uint8Array(nu * nv);
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+    const uc = (us[i] + us[i + 1]) / 2, vc = (vs[j] + vs[j + 1]) / 2;
+    solid[j * nu + i] = openings.some(o => uc > o.u0 && uc < o.u1 && vc > o.v0 && vc < o.v1) ? 0 : 1;
+  }
+  const S = (i, j) => i >= 0 && j >= 0 && i < nu && j < nv && solid[j * nu + i] === 1;
+  const h = T / 2;
+  const uvf = (f, u, v, w) => {
+    if (layout === 'two') {
+      if (f === 1) return [u / L, 0.5 * v / H];
+      if (f === 4) return [u / L, 0.501];
+      return [u / L, 0.5 + 0.5 * v / H];
+    }
+    if (layout === 'four') {
+      if (f === 0) return [0.25 * (u / L), v / H];
+      if (f === 3) return [0.25 * (1 + (h - w) / T), v / H];
+      if (f === 1) return [0.25 * (2 + (L - u) / L), v / H];
+      if (f === 2) return [0.25 * (3 + (w + h) / T), v / H];
+      return [0.01, v / H];
+    }
+    return [u / L, v / H];
+  };
+  const P = [], N = [], UV = [], I = [];
+  const quad = (pts, n, f) => {
+    const k = P.length / 3;
+    for (const p of pts) { P.push(p[0], p[1], p[2]); N.push(n[0], n[1], n[2]); UV.push(...uvf(f, p[0], p[1], p[2])); }
+    I.push(k, k + 1, k + 2, k, k + 2, k + 3);
+  };
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+    if (!S(i, j)) continue;
+    const u0 = us[i], u1 = us[i + 1], v0 = vs[j], v1 = vs[j + 1];
+    quad([[u0, v0, h], [u1, v0, h], [u1, v1, h], [u0, v1, h]], [0, 0, 1], 0);
+    quad([[u1, v0, -h], [u0, v0, -h], [u0, v1, -h], [u1, v1, -h]], [0, 0, -1], 1);
+    if (!S(i - 1, j)) quad([[u0, v0, -h], [u0, v0, h], [u0, v1, h], [u0, v1, -h]], [-1, 0, 0], 2);
+    if (!S(i + 1, j)) quad([[u1, v0, h], [u1, v0, -h], [u1, v1, -h], [u1, v1, h]], [1, 0, 0], 3);
+    if (!S(i, j - 1)) quad([[u0, v0, -h], [u1, v0, -h], [u1, v0, h], [u0, v0, h]], [0, -1, 0], 4);
+    if (!S(i, j + 1)) quad([[u0, v1, h], [u1, v1, h], [u1, v1, -h], [u0, v1, -h]], [0, 1, 0], 5);
+  }
+  return { P, N, UV, I };
+}
+
+function buildMesh(spec, material, layout = 'shared') {
+  const { origin: O, U, V } = spec;
+  const W = new THREE.Vector3().crossVectors(U, V).normalize();
+  const g = panelGeometry(spec.L, spec.H, spec.T, spec.openings || [], spec.cell || 0.25, layout);
+  const n = g.P.length / 3, pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const a = g.P[3 * i], b = g.P[3 * i + 1], c = g.P[3 * i + 2];
+    pos[3 * i] = O.x + U.x * a + V.x * b + W.x * c;
+    pos[3 * i + 1] = O.y + U.y * a + V.y * b + W.y * c;
+    pos[3 * i + 2] = O.z + U.z * a + V.z * b + W.z * c;
+    const p = g.N[3 * i], q = g.N[3 * i + 1], r = g.N[3 * i + 2];
+    nrm[3 * i] = U.x * p + V.x * q + W.x * r;
+    nrm[3 * i + 1] = U.y * p + V.y * q + W.y * r;
+    nrm[3 * i + 2] = U.z * p + V.z * q + W.z * r;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(g.UV, 2));
+  geo.setIndex(g.I);
+  geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = mesh.receiveShadow = true;
+  mesh.userData.base = pos.slice();
+  return mesh;
+}
+
+/* ---------- texturas de superfície (canvas) ---------- */
+function speckle(ctx, w, h, color, rng, amount = 1) {
+  ctx.fillStyle = color; ctx.fillRect(0, 0, w, h);
+  const n = Math.round(w * h / 45 * amount);
+  for (let i = 0; i < n; i++) {
+    const d = rng() < 0.5;
+    ctx.fillStyle = d ? `rgba(0,0,0,${0.03 + rng() * 0.05})` : `rgba(255,255,255,${0.04 + rng() * 0.07})`;
+    const s = 1 + rng() * 1.6;
+    ctx.fillRect(rng() * w, rng() * h, s, s);
+  }
+}
+function paintBlocks(ctx, w, h, L, H, rng) {
+  const sx = w / L, sy = h / H;
+  ctx.fillStyle = '#b9b2a6'; ctx.fillRect(0, 0, w, h);
+  const BW = 0.4, RH = 0.2, J = 0.01;
+  for (let k = 0; k * RH < H; k++) {
+    const off = (k % 2) * 0.2;
+    for (let u = -off; u < L; u += BW) {
+      const t = rng();
+      ctx.fillStyle = `hsl(${14 + t * 8},${42 + t * 10}%,${46 + rng() * 9}%)`;
+      const x0 = Math.max(0, u + J / 2), x1 = Math.min(L, u + BW - J / 2);
+      if (x1 <= x0) continue;
+      const v0 = k * RH + J / 2, v1 = Math.min(H, (k + 1) * RH - J / 2);
+      ctx.fillRect(x0 * sx, h - v1 * sy, (x1 - x0) * sx, (v1 - v0) * sy);
+    }
+  }
+  const n = Math.round(w * h / 60);
+  for (let i = 0; i < n; i++) { ctx.fillStyle = `rgba(0,0,0,${rng() * 0.06})`; ctx.fillRect(rng() * w, rng() * h, 1.5, 1.5); }
+}
+// Peças cerâmicas: porcelanato 60×60 no piso, azulejo 30×40 nas paredes revestidas.
+const TILE = { floor: [0.6, 0.6], wall: [0.3, 0.4] };
+const TILE_PAL = { floor: { h: 38, s: 18, l: 80, v: 6, grout: '#a49d90' }, wall: { h: 190, s: 8, l: 91, v: 3, grout: '#bfc4c4' } };
+function paintTiles(ctx, r, L, H, type, rng, cutouts = []) {
+  const [tw, th] = TILE[type], pal = TILE_PAL[type], sx = r.w / L, sy = r.h / H;
+  const g = Math.max(0.003, 0.6 / sx);
+  ctx.fillStyle = pal.grout; ctx.fillRect(r.x, r.y, r.w, r.h);
+  for (let j = 0; j * th < H; j++) for (let i = 0; i * tw < L; i++) {
+    ctx.fillStyle = `hsl(${pal.h},${pal.s}%,${pal.l + (rng() - 0.5) * pal.v}%)`;
+    const u0 = i * tw + g, u1 = Math.min(L, (i + 1) * tw - g), v0 = j * th + g, v1 = Math.min(H, (j + 1) * th - g);
+    ctx.fillRect(r.x + u0 * sx, r.y + r.h - v1 * sy, (u1 - u0) * sx, (v1 - v0) * sy);
+  }
+  for (let i = 0, n = Math.round(r.w * r.h / 70); i < n; i++) {
+    ctx.fillStyle = `rgba(0,0,0,${rng() * 0.035})`; ctx.fillRect(r.x + rng() * r.w, r.y + rng() * r.h, 1.4, 1.4);
+  }
+  // recortes em volta dos pilares (a junta contorna o pilar)
+  ctx.fillStyle = pal.grout;
+  for (const c of cutouts) ctx.fillRect(r.x + (c.u0 - 2 * g) * sx, r.y + r.h - (c.v1 + 2 * g) * sy, (c.u1 - c.u0 + 4 * g) * sx, (c.v1 - c.v0 + 4 * g) * sy);
+}
+function columnCutouts(spec) {
+  const O = spec.origin;
+  return state.model.columns.map(c => ({ u0: c.x - c.b / 2 - O.x, u1: c.x + c.b / 2 - O.x, v0: c.z - c.h / 2 - O.z, v1: c.z + c.h / 2 - O.z }))
+    .filter(c => c.u1 > 0 && c.u0 < spec.L && c.v1 > 0 && c.v0 < spec.H);
+}
+function ensureCeramic(e) {
+  const s = e.surf;
+  if (!s.bases.ceramica) {
+    const c = document.createElement('canvas'); c.width = s.w; c.height = s.h;
+    const ctx = c.getContext('2d'), rng = mulberry32(hashStr(e.id + 'cer'));
+    for (const r of s.regions) paintTiles(ctx, r, e.frame.L, e.frame.H, e.type, rng, e.type === 'floor' ? columnCutouts(e.frame) : []);
+    s.bases.ceramica = c;
+  }
+  return s.bases.ceramica;
+}
+const faceL = (e, f) => e.layout === 'four' && f % 2 === 1 ? e.frame.T : e.frame.L;
+function makeSurface(e, spec) {
+  const ppm = spec.ppm || 110, lay = e.layout;
+  const fw = Math.round((lay === 'four' ? Math.max(spec.L, spec.T) : spec.L) * ppm), fh = Math.round(spec.H * ppm);
+  const w = clamp(lay === 'four' ? fw * 4 : fw, 4, 2048), h = clamp(lay === 'two' ? fh * 2 : fh, 4, 2048);
+  const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const canvas = mk(), ctx = canvas.getContext('2d');
+  const rng = mulberry32(hashStr(e.id));
+  const bases = {};
+  if (e.type === 'wall') {
+    bases.reboco = mk(); speckle(bases.reboco.getContext('2d'), w, h, '#ece8e1', rng);
+    bases.blocos = mk(); paintBlocks(bases.blocos.getContext('2d'), w, h, spec.L, spec.H, rng);
+  } else if (e.type !== 'floor') {
+    const col = { slab: '#c8cacb', cantilever: '#c8cacb' }[e.type] || '#bfc2c4';
+    bases.concreto = mk(); speckle(bases.concreto.getContext('2d'), w, h, col, rng, 1.3);
+  }
+  let regions;
+  if (lay === 'two') regions = [{ x: 0, y: 0, w, h: h / 2 }, { x: 0, y: h / 2, w, h: h / 2 }];
+  else if (lay === 'four') regions = [0, 1, 2, 3].map(k => ({ x: k * w / 4, y: 0, w: w / 4, h }));
+  else regions = [{ x: 0, y: 0, w, h }];
+  regions.forEach((r, f) => r.L = faceL(e, f));
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = anisotropy;
+  return { canvas, ctx, tex, bases, w, h, regions };
+}
+
+/* ---------- construção da cena a partir do modelo ---------- */
+function trimEnds(el) {
+  const dx0 = el.x2 - el.x1, dz0 = el.z2 - el.z1, len = Math.hypot(dx0, dz0);
+  const dx = dx0 / len, dz = dz0 / len;
+  const half = c => Math.abs(dx) * c.b / 2 + Math.abs(dz) * c.h / 2;
+  const at = (x, z) => state.model.columns.find(c => Math.hypot(c.x - x, c.z - z) < 0.05);
+  const c1 = at(el.x1, el.z1), c2 = at(el.x2, el.z2);
+  const t0 = c1 ? half(c1) : 0, t1 = c2 ? half(c2) : 0;
+  return { x: el.x1 + dx * t0, z: el.z1 + dz * t0, dx, dz, len, t0, L: len - t0 - t1 };
+}
+function wallTop(w) {
+  const m = state.model, lv = w.level + 1;
+  const mx = (w.x1 + w.x2) / 2, mz = (w.z1 + w.z2) / 2;
+  const b = m.beams.find(b => b.level === lv && distPointSeg(mx, mz, b.x1, b.z1, b.x2, b.z2) < 0.05);
+  return lv * m.pd - 0.005 - (b ? b.h : 0.12) - 0.004;
+}
+// Borda engastada do balanço: a que encosta no contorno da edificação.
+function cantileverSupport(s) {
+  const b = bounds, tol = 0.05;
+  if (Math.abs(s.z1 - b.z0) < tol) return { axis: 'z', at: s.z1, out: -1 };
+  if (Math.abs(s.z0 - b.z1) < tol) return { axis: 'z', at: s.z0, out: 1 };
+  if (Math.abs(s.x1 - b.x0) < tol) return { axis: 'x', at: s.x1, out: -1 };
+  if (Math.abs(s.x0 - b.x1) < tol) return { axis: 'x', at: s.x0, out: 1 };
+  const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, mx = (s.x0 + s.x1) / 2, mz = (s.z0 + s.z1) / 2;
+  if (Math.abs(mz - cz) > Math.abs(mx - cx)) return mz < cz ? { axis: 'z', at: s.z1, out: -1 } : { axis: 'z', at: s.z0, out: 1 };
+  return mx < cx ? { axis: 'x', at: s.x1, out: -1 } : { axis: 'x', at: s.x0, out: 1 };
+}
+
+// Limites em planta: pelos pilares; sem pilares, pelos demais elementos; modelo vazio usa 8 × 6 m.
+function modelBounds(m) {
+  let xs = m.columns.map(c => c.x), zs = m.columns.map(c => c.z);
+  if (!xs.length) {
+    for (const e of [...m.walls, ...m.beams]) { xs.push(e.x1, e.x2); zs.push(e.z1, e.z2); }
+    for (const r of [...m.slabs, ...(m.pisos || [])]) { xs.push(r.x0, r.x1); zs.push(r.z0, r.z1); }
+  }
+  if (!xs.length) { xs = [0, 8]; zs = [0, 6]; }
+  return { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), y1: m.floors * m.pd };
+}
+
+function addEntry(type, data, spec, layout, extras = []) {
+  const e = { id: data.id, type, data, frame: spec, layout, meshes: [], materials: [], cracks: [], noSettle: !!spec.noSettle };
+  e.surf = makeSurface(e, spec);
+  const mat = new THREE.MeshStandardMaterial({ map: e.surf.tex, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+  e.materials.push(mat);
+  e.meshes.push(buildMesh(spec, mat, layout));
+  for (const x of extras) {
+    const m2 = new THREE.MeshStandardMaterial({ color: x.color || '#a9acae', roughness: 0.95, side: THREE.DoubleSide });
+    e.materials.push(m2);
+    const mesh = buildMesh(x, m2);
+    mesh.userData.part = x.part;
+    e.meshes.push(mesh);
+  }
+  for (const m of e.meshes) { m.userData.id = e.id; root.add(m); }
+  entries.set(e.id, e);
+  redraw(e);
+  return e;
+}
+
+function buildScene(model) {
+  for (const e of entries.values()) {
+    for (const m of e.meshes) { root.remove(m); m.geometry.dispose(); }
+    for (const m of e.materials) { m.map?.dispose(); m.dispose(); }
+  }
+  entries.clear(); crackedIds = new Set();
+  model.vinculo ||= 'hiperestatica';
+  state.model = model; state.sel = state.hover = null;
+  const pd = model.pd, top = model.floors * pd;
+  colMap = new Map(model.columns.map(c => [c.id, c]));
+  beamInfo = new Map(); cantInfo = new Map();
+  bounds = modelBounds(model);
+  const X = V3(1, 0, 0), Y = V3(0, 1, 0), Z = V3(0, 0, 1);
+
+  for (const c of model.columns) {
+    addEntry('column', c,
+      { origin: V3(c.x - c.b / 2, -0.5, c.z), U: X, V: Y, L: c.b, H: top - 0.006 + 0.5, T: c.h, cell: 0.25, ppm: 300 }, 'four',
+      [{ origin: V3(c.x - 0.4, -0.8, c.z), U: X, V: Y, L: 0.8, H: 0.3, T: 0.8, cell: 0.4, part: 'footing' }]);
+  }
+  for (const b of model.beams) {
+    const t = trimEnds(b), ytop = b.level * pd - 0.005;
+    beamInfo.set(b.id, { x1: b.x1, z1: b.z1, dx: t.dx, dz: t.dz, Lc: t.len, ytop: b.level * pd, h: b.h, b: b.b, level: b.level });
+    addEntry('beam', b, { origin: V3(t.x, ytop - b.h, t.z), U: V3(t.dx, 0, t.dz), V: Y, L: t.L, H: b.h, T: b.b, cell: 0.2, ppm: 160 }, 'two');
+  }
+  for (const s of model.slabs) {
+    const cant = s.kind === 'balanco';
+    if (cant) {
+      const sup = cantileverSupport(s);
+      const len = sup.axis === 'z' ? s.z1 - s.z0 : s.x1 - s.x0;
+      cantInfo.set(s.id, { ...sup, len, x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1, ytop: s.level * pd });
+    }
+    addEntry(cant ? 'cantilever' : 'slab', s,
+      { origin: V3(s.x0, s.level * pd - s.t / 2, s.z0), U: X, V: Z, L: s.x1 - s.x0, H: s.z1 - s.z0, T: s.t, cell: 0.3, ppm: 90 }, 'two');
+  }
+  // Piso em camadas (espessuras exageradas para o corte): contrapiso, argamassa colante e peças cerâmicas.
+  for (const p of model.pisos || []) {
+    const L = p.x1 - p.x0, H = p.z1 - p.z0;
+    const mortar = { origin: V3(p.x0, 0.0225, p.z0), U: X, V: Z, L, H, T: 0.025, cell: 0.6, part: 'mortar', color: '#a39d92' };
+    const e = addEntry('floor', p, { origin: V3(p.x0, 0.0425, p.z0), U: X, V: Z, L, H, T: 0.015, cell: 0.15, ppm: 110, noSettle: true }, 'two',
+      [mortar, { origin: V3(p.x0, -0.015, p.z0), U: X, V: Z, L, H, T: 0.05, cell: 0.6, part: 'contrapiso', color: '#b4b6b6' }]);
+    e.mortarSpec = mortar; e.voidKey = '[]';
+  }
+  for (const w of model.walls) {
+    const t = trimEnds(w), base = w.level * pd, H = wallTop(w) - base;
+    const openings = (w.openings || []).map(o => ({
+      type: o.type, u0: clamp(o.pos - t.t0, 0.05, t.L), u1: clamp(o.pos - t.t0 + o.width, 0, t.L - 0.05),
+      v0: o.sill, v1: Math.min(o.sill + o.height, H - 0.05)
+    })).filter(o => o.u1 > o.u0 && o.v1 > o.v0);
+    addEntry('wall', w, {
+      origin: V3(t.x, base, t.z), U: V3(t.dx, 0, t.dz), V: Y, L: t.L, H, T: w.t, openings, cell: 0.2, ppm: 120,
+      colStart: t.t0 > 0, colEnd: t.len - t.t0 - t.L > 1e-6
+    }, 'shared');
+  }
+  document.querySelector(`input[name=vinc][value=${model.vinculo}]`).checked = true;
+  $('#vincNote').textContent = VINC_NOTE[model.vinculo];
+  applyLayers(); applyCut(); regen();
+  needDeform = true;
+}
+
+/* ---------- deformada exagerada ---------- */
+const isIso = () => state.model.vinculo === 'isostatica';
+const setR = () => isIso() ? 2.0 : 3.2;
+// Deslocamento vertical normalizado (0..1) que um recalque ou esmagamento impõe no ponto.
+function supportField(s, x, y, z) {
+  const c = colMap.get(s.target), R = setR();
+  const g = Math.exp(-((x - c.x) ** 2 + (z - c.z) ** 2) / (R * R));
+  return s.type === 'recalque' ? g : g * clamp((y - CRUSH_Y0) / (CRUSH_Y1 - CRUSH_Y0), 0, 1);
+}
+function beamShape(b, x, y, z, flex) {
+  const rx = x - b.x1, rz = z - b.z1, s = rx * b.dx + rz * b.dz;
+  if (s <= 0 || s >= b.Lc) return 0;
+  const lat = Math.abs(rx * b.dz - rz * b.dx), half = b.b / 2 + 0.03;
+  const yb = b.ytop - 0.005 - b.h;
+  let wv, wl;
+  if (y < yb - 0.002) {   // topo da parede logo abaixo acompanha a viga, para não haver interpenetração
+    if (lat > half + 0.05) return 0;
+    wl = 1; wv = clamp(1 - (yb - y) / 0.9, 0, 1);
+  } else if (y <= b.ytop + 0.01) { wv = 1; wl = lat <= half ? 1 : Math.max(0, 1 - (lat - half) / 1.6); }
+  else { if (lat > half + 0.05) return 0; wl = 1; wv = Math.max(0, 1 - (y - b.ytop) / (state.model.pd - 0.4)); }
+  const sn = Math.sin(PI * s / b.Lc);
+  // viga contínua (hiperestática) tem tangente horizontal nos apoios
+  return (flex && !isIso() ? sn * sn : sn) * wv * wl;
+}
+function cantShape(c, x, y, z) {
+  if (y < c.ytop - 0.2 || y > c.ytop + 0.01) return 0;
+  if (x < c.x0 - 0.01 || x > c.x1 + 0.01 || z < c.z0 - 0.01 || z > c.z1 + 0.01) return 0;
+  const d = ((c.axis === 'z' ? z : x) - c.at) * c.out;
+  return d <= 0 ? 0 : (d / c.len) ** 2;
+}
+// Peso da movimentação térmica da laje do nível lv em função da altura.
+function thermalW(lv, y) {
+  const pd = state.model.pd, yt = lv * pd;
+  if (y > yt + 0.01) return Math.max(0, 1 - (y - yt) / pd);
+  if (y >= yt - 0.45) return 1;
+  const r = (y - (yt - pd)) / (pd - 0.45);
+  return r <= 0 ? 0 : r ** 3;
+}
+// Monta, para o quadro atual, uma função de deslocamento por cenário (constantes já resolvidas).
+function dispTerms() {
+  const kInt = 0.35 + 0.65 * state.intensity, pd = state.model.pd, iso = isIso(), R2 = setR() ** 2;
+  const cx = (bounds.x0 + bounds.x1) / 2, cz = (bounds.z0 + bounds.z1) / 2;
+  const terms = [];
+  for (const s of state.scen) {
+    const te = ease(s.t);
+    if (te <= 0) continue;
+    const A = kInt * state.exag * te;
+    switch (s.type) {
+      case 'recalque': case 'esmagamento': {
+        const c = colMap.get(s.target), amp = (s.type === 'recalque' ? 0.18 : 0.10) * A, crush = s.type === 'esmagamento';
+        terms.push((x, y, z, e, part, o) => {
+          if (e.noSettle) return;
+          let g = Math.exp(-((x - c.x) ** 2 + (z - c.z) ** 2) / R2);
+          if (crush) g *= clamp((y - CRUSH_Y0) / (CRUSH_Y1 - CRUSH_Y0), 0, 1);
+          o.y -= amp * g;
+        });
+        break;
+      }
+      case 'tracao': {
+        const amp = 0.14 * A;
+        terms.push((x, y, z, e, part, o) => {
+          if (e.id === s.target) o.y -= amp * (part === 'footing' ? 1 : 0.4 * clamp(1 - (y + 0.5) / (pd + 0.5), 0, 1));
+        });
+        break;
+      }
+      case 'flexao': case 'cisalhamento': {
+        const b = beamInfo.get(s.target), flex = s.type === 'flexao', amp = (flex ? 0.09 * (iso ? 1.5 : 0.75) : 0.025) * A;
+        terms.push((x, y, z, e, part, o) => { o.y -= amp * beamShape(b, x, y, z, flex); });
+        break;
+      }
+      case 'balanco': {
+        const c = cantInfo.get(s.target), amp = 0.16 * A;
+        terms.push((x, y, z, e, part, o) => { o.y -= amp * cantShape(c, x, y, z); });
+        break;
+      }
+      case 'descolamento': {   // estufamento do piso: as peças levantam em "telhado" ao longo da fissura da base
+        const f = entries.get(s.target), b = f?.bump;
+        if (!b) break;
+        const amp = 0.05 * A, O = f.frame.origin;
+        terms.push((x, y, z, e, part, o) => {
+          if (e !== f || part) return;
+          const u = x - O.x, t = 1 - Math.abs(z - O.z - b.vline) / 0.6;
+          if (u > b.us && u < b.ue && t > 0) o.y += amp * t * Math.sin(PI * (u - b.us) / (b.ue - b.us));
+        });
+        break;
+      }
+      case 'expansao': case 'retracao': {
+        const k0 = 0.015 * A * (s.type === 'expansao' ? 1 : -1), lv = s.level;
+        terms.push((x, y, z, e, part, o) => {
+          if (e.noSettle) return;
+          const w = thermalW(lv, y);
+          if (w > 0) { o.x += k0 * w * (x - cx); o.z += k0 * w * (z - cz); }
+        });
+        break;
+      }
+    }
+  }
+  return terms;
+}
+const _o = { x: 0, y: 0, z: 0 };
+function applyDeformation() {
+  const any = state.scen.length > 0, terms = any ? dispTerms() : [];
+  for (const e of entries.values()) for (const m of e.meshes) {
+    if (!any && !m.userData.deformed) continue;
+    const attr = m.geometry.attributes.position, base = m.userData.base, a = attr.array, part = m.userData.part;
+    for (let i = 0; i < a.length; i += 3) {
+      _o.x = _o.y = _o.z = 0;
+      for (const t of terms) t(base[i], base[i + 1], base[i + 2], e, part, _o);
+      a[i] = base[i] + _o.x; a[i + 1] = base[i + 1] + _o.y; a[i + 2] = base[i + 2] + _o.z;
+    }
+    m.userData.deformed = any;
+    attr.needsUpdate = true;
+    m.geometry.computeBoundingSphere();
+  }
+}
+
+/* ---------- fissuras: geração ---------- */
+// Cada item desenhado na textura: fissura (linha), mancha de ferrugem ou desplacamento com armadura exposta.
+// Coordenadas (u,v) em metros na face; "faces" diz em quais regiões da textura ele aparece.
+function crackPath(rng, u0, v0, ang, len, L, H, jit = 0.35) {
+  const step = clamp(len / 40, 0.006, 0.03);
+  const pts = [[u0, v0]];
+  let a = ang, u = u0, v = v0;
+  for (let i = 0, n = Math.ceil(len / step); i < n; i++) {
+    a += (rng() - 0.5) * jit; a += (ang - a) * 0.3;
+    u += Math.cos(a) * step; v += Math.sin(a) * step;
+    if (u < 0 || u > L || v < 0 || v > H) break;
+    pts.push([u, v]);
+  }
+  return pts;
+}
+function resample(pts, step) {
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const [a, b] = pts[i - 1], [c, d] = pts[i], l = Math.hypot(c - a, d - b), n = Math.max(1, Math.ceil(l / step));
+    for (let k = 1; k <= n; k++) out.push([a + (c - a) * k / n, b + (d - b) * k / n]);
+  }
+  return out;
+}
+// Versão "escalonada" para alvenaria sem reboco: a fissura percorre as juntas dos blocos (0,40 × 0,20 m).
+function toJoint(pts, H) {
+  const RH = 0.2, BW = 0.4;
+  const first = pts[0], last = pts[pts.length - 1];
+  if (Math.abs(last[1] - first[1]) < Math.abs(last[0] - first[0]) * 0.3) {
+    const vj = Math.min(Math.round((first[1] + last[1]) / 2 / RH) * RH, Math.floor((H - 0.02) / RH) * RH);
+    return resample([[first[0], vj], [last[0], vj]], 0.025);
+  }
+  const snap = (u, k) => { const off = (((k % 2) + 2) % 2) * 0.2; return Math.round((u - off) / BW) * BW + off; };
+  let k = Math.floor(first[1] / RH), cu = snap(first[0], k);
+  const out = [[cu, first[1]]];
+  for (let i = 1; i < pts.length; i++) {
+    const nk = Math.floor(pts[i][1] / RH);
+    if (nk !== k) {
+      const vj = RH * Math.max(k, nk);
+      out.push([cu, vj]);
+      cu = snap(pts[i][0], nk);
+      out.push([cu, vj]);
+      k = nk;
+    }
+  }
+  out.push([cu, last[1]]);
+  return resample(out, 0.025);
+}
+function pushCrack(e, list, pts, w, delay, tw, rng, branch = 0.35, faces = [0]) {
+  if (pts.length < 3) return;
+  const isWall = e.type === 'wall', H = e.frame.H, Lf = faceL(e, faces[0]);
+  list.push({ kind: 'line', pts, w, delay, tw, faces, joint: isWall ? toJoint(pts, H) : null });
+  if (rng() < branch && pts.length > 12) {
+    const i = Math.floor(pts.length * (0.3 + 0.4 * rng()));
+    const [a, b] = pts[i - 1], [c, d] = pts[i + 1];
+    const ang = Math.atan2(d - b, c - a) + (rng() < 0.5 ? -1 : 1) * (0.4 + 0.35 * rng());
+    const len = Math.hypot(pts[pts.length - 1][0] - pts[0][0], pts[pts.length - 1][1] - pts[0][1]) * (0.15 + 0.15 * rng());
+    const bp = crackPath(rng, pts[i][0], pts[i][1], ang, len, Lf, H);
+    if (bp.length > 3) list.push({ kind: 'line', pts: bp, w: w * 0.5, delay: delay + (1 - delay) * (i / pts.length) * 0.8, tw, faces, joint: isWall ? toJoint(bp, H) : null });
+  }
+}
+function blob(rng, uc, vc, ru, rv) {
+  const pts = [], n = 14;
+  for (let i = 0; i < n; i++) {
+    const a = i / n * 2 * PI, r = 0.7 + 0.45 * rng();
+    pts.push([uc + Math.cos(a) * ru * r, vc + Math.sin(a) * rv * r]);
+  }
+  return pts;
+}
+const stain = (u, v, ru, rv, faces, delay, tw) => ({ kind: 'stain', u, v, ru, rv, faces, delay, tw });
+
+// Recalque e esmagamento: distorção dos panos pelo deslocamento vertical diferencial dos apoios.
+function wallSupportCracks(e, sups) {
+  const { origin: O, U, L, H } = e.frame, yTop = O.y + H;
+  const fOne = (u, s) => supportField(s, O.x + U.x * u, yTop, O.z + U.z * u);
+  const f = u => sups.reduce((acc, s) => acc + fOne(u, s), 0);
+  const N = Math.max(2, Math.ceil(L / 0.1));
+  let um = 0, fm = -1;
+  for (let i = 0; i <= N; i++) { const u = L * i / N, v = f(u); if (v > fm) { fm = v; um = u; } }
+  const tw = sups.map(s => ({ id: s.id, w: Math.abs(fOne(0, s) - fOne(L, s)) + Math.abs(fOne(um, s) - fOne(0, s)) })).filter(t => t.w > 1e-3);
+  const rng = mulberry32(hashStr(e.id + 'recalque'));
+  const I = state.intensity, out = [], boost = isIso() ? 1.25 : 1;
+  for (const side of [{ dir: 1, far: 0 }, { dir: -1, far: L }]) {
+    if (Math.abs(um - side.far) < 0.3) continue;
+    const delta = fm - f(side.far);
+    if (delta < 0.12) continue;
+    const sev = clamp(delta * 1.25 * boost, 0, 1) * (0.35 + 0.65 * I);
+    const dir = side.dir, maxN = 1 + Math.round(sev * 6);
+    const lo = Math.min(um, side.far), hi = Math.max(um, side.far);
+    const cand = [];
+    // cantos das aberturas: canto superior voltado ao apoio que desceu e canto inferior oposto
+    for (const o of e.frame.openings || []) {
+      const uc = (o.u0 + o.u1) / 2;
+      if (uc < lo || uc > hi) continue;
+      cand.push({ u: dir > 0 ? o.u1 : o.u0, v: o.v1, ang: dir > 0 ? PI / 4 : 3 * PI / 4, len: (H - o.v1) * 1.5 });
+      if (o.v0 > 0.05) cand.push({ u: dir > 0 ? o.u0 : o.u1, v: o.v0, ang: dir > 0 ? -3 * PI / 4 : -PI / 4, len: o.v0 * 1.5 });
+    }
+    for (let k = 0; k < 5; k++) {
+      const u = um - dir * (0.25 + k * 0.5 + rng() * 0.25), v = H * (0.78 + 0.2 * rng());
+      if (u < 0.05 || u > L - 0.05) continue;
+      if ((e.frame.openings || []).some(o => u > o.u0 - 0.05 && u < o.u1 + 0.05 && v > o.v0 && v < o.v1 + 0.05)) continue;
+      cand.push({ u, v, ang: dir > 0 ? -3 * PI / 4 : -PI / 4, len: H * (0.45 + 0.55 * sev) * 1.41 * (0.7 + 0.3 * rng()) });
+    }
+    cand.slice(0, maxN).forEach((c, k) => {
+      const pts = crackPath(rng, c.u, c.v, c.ang + (rng() - 0.5) * 0.12, c.len * (0.55 + 0.45 * sev), L, H);
+      pushCrack(e, out, pts, (1.3 + 4.2 * sev) * (1 - k * 0.1), clamp(k * 0.07 + rng() * 0.05, 0, 0.5), tw, rng);
+    });
+  }
+  return out;
+}
+
+// Movimentação térmica da laje: topo das paredes logo abaixo dela.
+function wallThermalCracks(e, s) {
+  const { L, H } = e.frame, I = state.intensity, out = [], tw = [{ id: s.id, w: 1 }];
+  const rng = mulberry32(hashStr(e.id + s.type)), sev = 0.35 + 0.65 * I, exp = s.type === 'expansao';
+  // fissura horizontal logo abaixo da laje, a partir das extremidades
+  for (const end of [0, 1]) {
+    const len = L * (0.25 + 0.3 * sev) * (0.8 + 0.3 * rng());
+    const v = H - 0.05 - rng() * 0.06;
+    pushCrack(e, out, crackPath(rng, end ? L - 0.01 : 0.01, v, end ? PI : 0, len, L, H, 0.12), 1 + 2.5 * sev, 0.05 * end, tw, rng, 0.15);
+  }
+  // inclinadas nos cantos superiores
+  const n = 1 + Math.round(I * 2);
+  for (const end of [0, 1]) for (let k = 0; k < n; k++) {
+    const d = exp ? 0.12 + k * 0.3 + rng() * 0.15 : 0.6 + k * 0.35 + rng() * 0.3;
+    if (d > L / 2) continue;
+    const u = end ? L - d : d;
+    const towardCenter = exp ? (end ? -3 * PI / 4 : -PI / 4) : (end ? -PI / 4 : -3 * PI / 4);
+    pushCrack(e, out, crackPath(rng, u, H - 0.02, towardCenter + (rng() - 0.5) * 0.15, (0.5 + 0.8 * sev) * (0.7 + 0.3 * rng()), L, H),
+      1.1 + 3 * sev, 0.15 + k * 0.1, tw, rng, 0.3);
+  }
+  return out;
+}
+function slabShrinkCracks(e, s) {
+  const { L, H } = e.frame, I = state.intensity, out = [], tw = [{ id: s.id, w: 1 }];
+  const rng = mulberry32(hashStr(e.id + 'retracao'));
+  const alongV = L >= H, span = alongV ? L : H, cross = alongV ? H : L, n = 1 + Math.round(I * 2);
+  for (let k = 0; k < n; k++) {
+    const p = span * ((k + 1) / (n + 1) + (rng() - 0.5) * 0.12);
+    const pts = alongV ? crackPath(rng, p, 0, PI / 2, cross * 1.05, L, H, 0.3) : crackPath(rng, 0, p, 0, cross * 1.05, L, H, 0.3);
+    pushCrack(e, out, pts, 1 + 2.5 * I, k * 0.1, tw, rng, 0.3, [0, 1]);
+  }
+  return out;
+}
+function cantileverCracks(e, s) {
+  const c = cantInfo.get(s.target), { L, H } = e.frame, I = state.intensity, out = [], tw = [{ id: s.id, w: 1 }];
+  const rng = mulberry32(hashStr(e.id + 'balanco'));
+  const n = 1 + Math.round(I * 3);
+  // posição do engaste em coordenadas da face (u ao longo de x, v ao longo de z)
+  const supAt = c.axis === 'z' ? c.at - c.z0 : c.at - c.x0, inward = -c.out;
+  for (let k = 0; k < n; k++) {
+    const d = 0.05 + k * 0.1 + rng() * 0.06;
+    const pos = supAt - inward * d;
+    const start = rng() * 0.25, len = (c.axis === 'z' ? L : H) * (0.55 + 0.45 * I) * (0.8 + 0.2 * rng());
+    const pts = c.axis === 'z' ? crackPath(rng, start * L, pos, 0, len, L, H, 0.22) : crackPath(rng, pos, start * H, PI / 2, len, L, H, 0.22);
+    pushCrack(e, out, pts, (1.2 + 3.5 * I) * (1 - k * 0.15), k * 0.12, tw, rng, 0.25, [1]);   // face 1 = topo da laje
+  }
+  return out;
+}
+
+function beamCracks(e, s) {
+  const { L, H, T } = e.frame, I = state.intensity, out = [], tw = [{ id: s.id, w: 1 }];
+  const rng = mulberry32(hashStr(e.id + s.type)), both = [0, 1];
+  if (s.type === 'flexao') {
+    const iso = isIso(), n = 2 + Math.round(I * 5) + (iso ? 2 : 0), spread = iso ? 0.45 : 0.3;
+    for (let k = 0; k < n; k++) {
+      const u = L / 2 + (rng() - 0.5) * L * (spread + 0.3 * I);
+      const tilt = (u - L / 2) / L * 0.6;
+      const len = H * (0.3 + 0.45 * I) * (0.75 + 0.25 * rng()) * (iso ? 1.15 : 1);
+      const w = (1 + 3.2 * I) * (1 - Math.abs(u - L / 2) / (L / 2) * 0.6) * (iso ? 1.2 : 0.9);
+      pushCrack(e, out, crackPath(rng, u, 0, PI / 2 + tilt + (rng() - 0.5) * 0.12, len, L, H, 0.25), w, clamp(k * 0.06, 0, 0.45), tw, rng, 0.2, both);
+    }
+    if (!iso) {   // momento negativo nos apoios da viga contínua
+      for (const end of [0, 1]) for (let k = 0; k < 1 + Math.round(I * 2); k++) {
+        const d = 0.04 + k * 0.18 + rng() * 0.08, u = end ? L - d : d;
+        pushCrack(e, out, crackPath(rng, u, H, -PI / 2 + (rng() - 0.5) * 0.15, H * (0.25 + 0.3 * I), L, H, 0.25), 1 + 2.4 * I, 0.2 + k * 0.08, tw, rng, 0.1, both);
+      }
+    }
+  } else if (s.type === 'cisalhamento') {
+    for (const side of [0, 1]) {
+      const n = 1 + Math.round(I * 3);
+      for (let k = 0; k < n; k++) {
+        const d = H * (0.5 + k * 0.45 + rng() * 0.2), u0 = side === 0 ? d : L - d;
+        if (u0 < 0 || u0 > L) continue;
+        const ang = side === 0 ? 3 * PI / 4 - 0.08 : PI / 4 + 0.08;
+        pushCrack(e, out, crackPath(rng, u0, H * 0.06, ang, H * 0.95 * 1.41 * (0.6 + 0.4 * I), L, H, 0.3), 1.2 + 3.5 * I, clamp(k * 0.1 + rng() * 0.05, 0, 0.45), tw, rng, 0.25, both);
+      }
+    }
+  } else if (s.type === 'torcao') {
+    // hélice: na face 0 sobe para um lado, passa pelo topo e desce na face 1; inverte em cada metade do vão
+    const n = 2 + Math.round(I * 4);
+    for (const side of [0, 1]) for (let k = 0; k < n; k++) {
+      const d = L * (0.03 + 0.42 * k / n + rng() * 0.04), sg = side ? -1 : 1;
+      const u = side ? L - d : d, w = (1.1 + 3 * I) * (1 - 0.45 * k / n), len = H * 1.45;
+      pushCrack(e, out, crackPath(rng, u, 0.01, side ? 3 * PI / 4 : PI / 4, len, L, H, 0.25), w, k * 0.07, tw, rng, 0.1, [0]);
+      pushCrack(e, out, crackPath(rng, u + sg * (H + T), H - 0.01, side ? -3 * PI / 4 : -PI / 4, len, L, H, 0.25), w, k * 0.07 + 0.05, tw, rng, 0.1, [1]);
+    }
+  }
+  return out;
+}
+
+function beamCorrosion(e, s) {
+  const { L, H } = e.frame, I = state.intensity, out = [], tw = [{ id: s.id, w: 1 }];
+  const rng = mulberry32(hashStr(e.id + 'corrosao')), cover = 0.04;
+  for (const f of [0, 1]) {
+    const n = 1 + Math.round(I * 2);
+    for (let k = 0; k < n; k++) {
+      const len = L * (0.2 + 0.35 * I) * (0.6 + 0.4 * rng()), u0 = rng() * (L - len);
+      out.push(stain(u0 + len / 2, cover - 0.01, len * 0.55, 0.05 + 0.04 * I, [f], 0.1 + k * 0.1, tw));
+      pushCrack(e, out, crackPath(rng, u0, cover + (rng() - 0.5) * 0.01, 0, len, L, H, 0.07), 1 + 2.2 * I, 0.15 + k * 0.1, tw, rng, 0.15, [f]);
+    }
+  }
+  if (I > 0.35) {
+    const f = rng() < 0.5 ? 0 : 1, len = 0.25 + 0.35 * I, uc = L * (0.25 + 0.5 * rng());
+    const bars = [[[uc - len * 0.6, cover], [uc + len * 0.6, cover]]];
+    for (let u = uc - len * 0.5; u < uc + len * 0.5; u += 0.15) bars.push([[u, 0], [u, 0.12]]);
+    out.push({ kind: 'spall', poly: blob(rng, uc, 0.04, len / 2, 0.08), bars, barW: 0.0125, faces: [f], delay: 0.45, tw });
+  }
+  return out;
+}
+
+function columnCorrosion(e, s) {
+  const H = e.frame.H, I = state.intensity, out = [], tw = [{ id: s.id, w: 1 }];
+  const rng = mulberry32(hashStr(e.id + 'corrosao')), cover = 0.035;
+  const corners = [0, 1, 2, 3].filter((c, i) => i < 2 + Math.round(I * 2));
+  corners.forEach((c, k) => {
+    const v0 = 0.55 + 0.1 + rng() * 0.5, len = (0.5 + 1.3 * I) * (0.7 + 0.3 * rng());
+    const a = c, b = (c + 1) % 4, La = faceL(e, a);
+    for (const [f, u] of [[a, La - cover], [b, cover]]) {
+      out.push(stain(u, v0 + len * 0.4, 0.04, len * 0.55, [f], 0.1 + k * 0.08, tw));
+      pushCrack(e, out, crackPath(rng, u, v0, PI / 2, len, faceL(e, f), H, 0.06), 1 + 2 * I, 0.15 + k * 0.08, tw, rng, 0.1, [f]);
+    }
+  });
+  if (I > 0.35) {   // desplacamento junto à base, numa quina
+    const c = Math.floor(rng() * 4), a = c, b = (c + 1) % 4, La = faceL(e, a), vc = 0.5 + 0.25 + rng() * 0.2, rv = 0.12 + 0.12 * I;
+    for (const [f, uE, uBar] of [[a, La, La - cover], [b, 0, cover]]) {
+      const bars = [[[uBar, vc - rv], [uBar, vc + rv]]];
+      for (let v = vc - rv; v < vc + rv; v += 0.15) bars.push([[uE === 0 ? 0 : La - 0.07, v], [uE === 0 ? 0.07 : La, v]]);
+      out.push({ kind: 'spall', poly: blob(rng, uE, vc, 0.07, rv), bars, barW: 0.0125, faces: [f], delay: 0.45, tw });
+    }
+  }
+  return out;
+}
+
+function columnCrush(e, s) {
+  const H = e.frame.H, I = state.intensity, out = [], tw = [{ id: s.id, w: 1 }];
+  const rng = mulberry32(hashStr(e.id + 'esmagamento'));
+  const v0 = CRUSH_Y0 + 0.5, v1 = CRUSH_Y1 + 0.5, vm = (v0 + v1) / 2;
+  for (let f = 0; f < 4; f++) {
+    const Lf = faceL(e, f), n = 2 + Math.round(I * 3);
+    for (let k = 0; k < n; k++) {
+      const u = Lf * (0.12 + 0.76 * rng()), len = (v1 - v0) * (0.35 + 0.6 * I) * (0.6 + 0.4 * rng()), vs = vm + (rng() - 0.5) * 0.3;
+      const w = 1 + 2.6 * I, dl = clamp(k * 0.08, 0, 0.4);
+      pushCrack(e, out, crackPath(rng, u, vs, PI / 2 + (rng() - 0.5) * 0.25, len / 2, Lf, H, 0.3), w, dl, tw, rng, 0.25, [f]);
+      pushCrack(e, out, crackPath(rng, u, vs, -PI / 2 + (rng() - 0.5) * 0.25, len / 2, Lf, H, 0.3), w, dl, tw, rng, 0.25, [f]);
+    }
+  }
+  if (I > 0.3) {   // lascamento nas quinas com barras flambadas
+    for (const c of [0, 2]) {
+      const a = c, b = (c + 1) % 4, La = faceL(e, a), rv = 0.12 + 0.18 * I, vc = vm + (rng() - 0.5) * 0.2;
+      for (const [f, uE, uBar, sg] of [[a, La, La - 0.035, -1], [b, 0, 0.035, 1]]) {
+        const bar = [];
+        for (let i = 0; i <= 12; i++) { const t = i / 12; bar.push([uBar + sg * 0.015 * I * Math.sin(PI * t), vc - rv + 2 * rv * t]); }
+        out.push({ kind: 'spall', poly: blob(rng, uE, vc, 0.08, rv), bars: [bar], barW: 0.0125, faces: [f], delay: 0.5, tw });
+      }
+    }
+  }
+  return out;
+}
+
+function columnTension(e, s) {
+  const H = e.frame.H, I = state.intensity, out = [], tw = [{ id: s.id, w: 1 }];
+  const rng = mulberry32(hashStr(e.id + 'tracao')), pd = state.model.pd;
+  const vEnd = 0.5 + pd - 0.5, sp = 0.45 - 0.2 * I;
+  let v = 0.5 + 0.25 + rng() * 0.1, k = 0;
+  while (v < vEnd) {
+    for (let f = 0; f < 4; f++) {
+      const Lf = faceL(e, f);
+      pushCrack(e, out, crackPath(rng, 0, v + (rng() - 0.5) * 0.01, 0, Lf * 1.05, Lf, H, 0.2), 1 + 2.2 * I, clamp(k * 0.05, 0, 0.5), tw, rng, 0, [f]);
+    }
+    v += sp * (0.8 + 0.4 * rng()); k++;
+  }
+  return out;
+}
+
+// Fissuras próprias da alvenaria. "mode" define o traçado: 'joint' sempre pelas juntas,
+// 'plain' sempre o traçado livre, 'auto' livre no reboco e pelas juntas nos blocos aparentes.
+function wallMasonryCracks(e, s) {
+  const { L, H } = e.frame, I = state.intensity, sev = 0.35 + 0.65 * I, out = [], tw = [{ id: s.id, w: 1 }];
+  const rng = mulberry32(hashStr(e.id + s.type));
+  const push = (pts, w, delay, mode, branch = 0.25) => {
+    const n0 = out.length;
+    pushCrack(e, out, pts, w, delay, tw, rng, branch);
+    for (let i = n0; i < out.length; i++) out[i].mode = mode;
+  };
+  if (s.type === 'escalonada') {
+    const dir = rng() < 0.5 ? 1 : -1, n = 1 + Math.round(I * 2);
+    for (let k = 0; k < n; k++) {
+      const u0 = dir > 0 ? L * (0.05 + 0.25 * k + rng() * 0.1) : L * (0.95 - 0.25 * k - rng() * 0.1);
+      push(crackPath(rng, u0, 0.02, dir > 0 ? PI / 4 : 3 * PI / 4, Math.min(H, L) * 1.41 * (0.6 + 0.4 * sev), L, H, 0.2), 1.3 + 3.5 * sev, k * 0.12, 'joint');
+    }
+  } else if (s.type === 'horizontal') {
+    const rows = Math.floor((H - 0.05) / 0.2);
+    const pick = [Math.round(rows * 0.72), 1, Math.round(rows * 0.45)].slice(0, 1 + Math.round(I * 2));
+    pick.forEach((j, k) => {
+      const len = L * (0.5 + 0.5 * sev) * (0.8 + 0.2 * rng()), u0 = rng() * (L - len);
+      push(crackPath(rng, u0, j * 0.2, 0, len, L, H, 0.1), 1.2 + 3 * sev, k * 0.15, 'joint', 0.15);
+    });
+  } else if (s.type === 'verga') {
+    const ext = 0.05;   // verga/contraverga praticamente sem transpasse
+    (e.frame.openings || []).forEach((o, k) => {
+      const lenTop = Math.min((H - o.v1) * 1.6, 1.4) * (0.6 + 0.4 * sev);
+      push(crackPath(rng, o.u0 - ext, o.v1 + 0.08, 3 * PI / 4 - 0.1, lenTop, L, H), 1.4 + 3.5 * sev, k * 0.1, 'auto');
+      push(crackPath(rng, o.u1 + ext, o.v1 + 0.08, PI / 4 + 0.1, lenTop, L, H), 1.4 + 3.5 * sev, k * 0.1 + 0.05, 'auto');
+      if (o.v0 > 0.05) {
+        const lenBot = o.v0 * 1.5 * (0.6 + 0.4 * sev);
+        push(crackPath(rng, o.u0 - ext, o.v0 - 0.08, -3 * PI / 4 + 0.1, lenBot, L, H), 1.2 + 3.2 * sev, k * 0.1 + 0.15, 'auto');
+        push(crackPath(rng, o.u1 + ext, o.v0 - 0.08, -PI / 4 - 0.1, lenBot, L, H), 1.2 + 3.2 * sev, k * 0.1 + 0.2, 'auto');
+      }
+    });
+  } else if (s.type === 'encunhamento') {
+    const pts = [];
+    for (let u = 0.005; u <= L - 0.005; u += 0.02) pts.push([u, H - 0.012 + (rng() - 0.5) * 0.006]);
+    out.push({ kind: 'line', pts, w: 1.8 + 3.5 * sev, delay: 0, tw, faces: [0], joint: null, mode: 'plain' });
+  } else if (s.type === 'interface') {
+    out.push(...interfaceCracks(e, tw, rng, sev));
+  }
+  return out;
+}
+// Encontro parede–pilar: sem tela, fissura vertical contínua; com tela, microfissuras distribuídas.
+function interfaceCracks(e, tw, rng, sev) {
+  const { L, H, colStart, colEnd } = e.frame, out = [], tela = e.data.tela !== false;
+  for (const [has, u, dir] of [[colStart, 0.012, 1], [colEnd, L - 0.012, -1]]) {
+    if (!has) continue;
+    if (!tela) {
+      const pts = [];
+      for (let v = 0.02; v <= H - 0.02; v += 0.02) pts.push([u + (rng() - 0.5) * 0.006, v]);
+      out.push({ kind: 'line', pts, w: 1.5 + 3 * sev, delay: 0, tw, faces: [0], joint: null, mode: 'plain' });
+    } else {
+      for (let k = 0, n = 5 + Math.round(sev * 5); k < n; k++) {
+        const uu = u + dir * (0.05 + rng() * 0.4), v = 0.2 + rng() * (H - 0.4);
+        const pts = crackPath(rng, uu, v, PI / 2 + (rng() < 0.5 ? -1 : 1) * (0.4 + rng() * 0.4), 0.08 + rng() * 0.12, L, H, 0.3);
+        if (pts.length > 2) out.push({ kind: 'line', pts, w: 0.8, delay: rng() * 0.4, tw, faces: [0], joint: null, mode: 'plain' });
+      }
+    }
+  }
+  return out;
+}
+
+/* ---------- revestimentos ---------- */
+const hasCeramic = e => e.type === 'floor' || (e.type === 'wall' && !!e.data.ceramica);
+const ceramicFace = e => e.type === 'floor' ? 1 : 0;   // no piso, a face 1 é a de cima
+const tileOf = (e, u, v) => { const [tw, th] = TILE[e.type]; return [Math.floor(u / tw), Math.floor(v / th)]; };
+function jseg(rng, a, b, amp) {
+  const n = 3, pts = [a];
+  const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+  for (let i = 1; i < n; i++) { const t = i / n, o = (rng() - 0.5) * amp; pts.push([a[0] + dx * t - dy / l * o, a[1] + dy * t + dx / l * o]); }
+  pts.push(b);
+  return pts;
+}
+// Reboco: rede de fissuras curtas que cresce do centro de cada mancha para fora.
+function plasterCracks(e, s) {
+  const { L, H } = e.frame, I = state.intensity, tw = [{ id: s.id, w: 1 }], out = [];
+  const rng = mulberry32(hashStr(e.id + s.type));
+  for (let p = 0, nP = 1 + Math.round(I * 2); p < nP; p++) {
+    const cu = L * (0.2 + 0.6 * rng()), cv = H * (0.25 + 0.5 * rng()), ru = 0.5 + 1.0 * I + rng() * 0.3, rv = ru * (0.6 + 0.3 * rng());
+    const inside = (u, v) => ((u - cu) / ru) ** 2 + ((v - cv) / rv) ** 2 < 1 - rng() * 0.3;
+    const segs = [];
+    if (s.type === 'mapeada') {
+      const c = 0.11 + 0.06 * (1 - I), i0 = Math.floor((cu - ru) / c), i1 = Math.ceil((cu + ru) / c), j0 = Math.floor((cv - rv) / c), j1 = Math.ceil((cv + rv) / c);
+      const node = new Map(), N = (i, j) => { const k = i + ',' + j; if (!node.has(k)) node.set(k, [i * c + (rng() - 0.5) * c * 0.75, j * c + (rng() - 0.5) * c * 0.75]); return node.get(k); };
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) for (const [a, b] of [[N(i, j), N(i + 1, j)], [N(i, j), N(i, j + 1)]]) {
+        if (rng() < 0.85 && inside((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)) segs.push(jseg(rng, a, b, c * 0.25));
+      }
+    } else {   // retração: reproduz as juntas da alvenaria (fiadas de 0,20 m, blocos de 0,40 m)
+      for (let k = Math.max(0, Math.floor((cv - rv) / 0.2)); k * 0.2 < Math.min(H, cv + rv); k++) {
+        const off = (k % 2) * 0.2;
+        for (let u = Math.floor((cu - ru) / 0.4) * 0.4 - off; u < cu + ru; u += 0.4) {
+          if (rng() < 0.7 && inside(u + 0.2, k * 0.2)) segs.push(jseg(rng, [u, k * 0.2], [u + 0.4, k * 0.2], 0.012));
+          if (rng() < 0.55 && inside(u, k * 0.2 + 0.1)) segs.push(jseg(rng, [u, k * 0.2], [u, k * 0.2 + 0.2], 0.012));
+        }
+      }
+    }
+    const d = q => Math.hypot((q[0][0] + q[q.length - 1][0]) / 2 - cu, (q[0][1] + q[q.length - 1][1]) / 2 - cv);
+    segs.sort((a, b) => d(a) - d(b));
+    out.push({ kind: 'net', segs, w: 0.6 + 0.7 * I, delay: p * 0.1, tw, faces: [0], layer: 'reboco' });
+  }
+  return out;
+}
+function pushCeramic(e, out, pts, w, delay, tw, rng, branch = 0.25) {
+  const n0 = out.length;
+  pushCrack(e, out, pts, w, delay, tw, rng, branch, [ceramicFace(e)]);
+  for (let i = n0; i < out.length; i++) { out[i].layer = 'ceramica'; out[i].mode = 'plain'; }
+}
+function ceramicCracks(e, s) {
+  const { L, H } = e.frame, I = state.intensity, tw = [{ id: s.id, w: 1 }], out = [], [tw_, th] = TILE[e.type];
+  const rng = mulberry32(hashStr(e.id + 'cerfis')), floor = e.type === 'floor';
+  // fissura da base que atravessa as peças
+  pushCeramic(e, out, crackPath(rng, L * (0.2 + 0.6 * rng()), 0.01, PI / 2 + (rng() - 0.5) * (floor ? 0.7 : 1.2), H * 1.15 * (0.6 + 0.4 * I), L, H, 0.25), 1.2 + 2.8 * I, 0, tw, rng, 0.3);
+  // peças isoladas trincadas a partir de um canto
+  for (let k = 0, n = 2 + Math.round(I * 5); k < n; k++) {
+    const i = Math.floor(rng() * L / tw_), j = Math.floor(rng() * H / th);
+    const cu = rng() < 0.5 ? 0 : 1, cv = rng() < 0.5 ? 0 : 1;
+    const u0 = (i + cu) * tw_ + (cu ? -0.01 : 0.01), v0 = (j + cv) * th + (cv ? -0.01 : 0.01);
+    const ang = Math.atan2(cv ? -1 : 1, cu ? -1 : 1) + (rng() - 0.5) * 0.7;
+    pushCeramic(e, out, crackPath(rng, u0, v0, ang, Math.min(tw_, th) * (0.5 + 0.5 * rng()), L, H, 0.3), 0.9 + 1.6 * I, 0.2 + k * 0.07, tw, rng, 0);
+  }
+  return out;
+}
+function detachCracks(e, s) {
+  const { L, H } = e.frame, I = state.intensity, tw = [{ id: s.id, w: 1 }], out = [], [tw_, th] = TILE[e.type];
+  const rng = mulberry32(hashStr(e.id + 'descol'));
+  if (e.type === 'floor') {
+    const jl = Math.max(1, Math.round(H * (0.35 + 0.3 * rng()) / th)), vline = jl * th;
+    const span = L * (0.35 + 0.5 * I), us = rng() * (L - span), ue = us + span;
+    e.bump = { vline, us, ue };
+    for (let i = Math.floor(us / tw_); i * tw_ < ue; i++) for (const j of [jl - 1, jl]) {
+      e.hollow.add(`${i},${j}`);
+      e.voids.push({ u0: i * tw_ + 0.08, u1: (i + 1) * tw_ - 0.08, v0: j * th + 0.08, v1: (j + 1) * th - 0.08 });
+    }
+    const pts = [];
+    for (let u = us; u <= ue; u += 0.03) pts.push([u, vline + (rng() - 0.5) * 0.004]);
+    out.push({ kind: 'line', pts, w: 1.6 + 3 * I, delay: 0, tw, faces: [1], joint: null, mode: 'plain', layer: 'ceramica' });
+    for (let k = 0, n = 2 + Math.round(I * 4); k < n; k++)
+      pushCeramic(e, out, crackPath(rng, us + rng() * span, vline, (rng() < 0.5 ? 1 : -1) * PI / 2 + (rng() - 0.5) * 0.5, 0.2 + rng() * 0.25, L, H, 0.3), 1 + 2 * I, 0.25 + k * 0.08, tw, rng, 0);
+  } else {
+    const dir = rng() < 0.5 ? 1 : -1;
+    const base = crackPath(rng, L * (dir > 0 ? 0.15 + 0.3 * rng() : 0.55 + 0.3 * rng()), 0.02, dir > 0 ? PI / 4 : 3 * PI / 4, Math.min(L, H) * 1.3, L, H, 0.25);
+    for (let j = 0; j * th < H; j++) for (let i = 0; i * tw_ < L; i++) {
+      const cu = (i + 0.5) * tw_, cv = (j + 0.5) * th;
+      if (!base.some(p => Math.hypot(p[0] - cu, p[1] - cv) < 0.32)) continue;
+      e.hollow.add(`${i},${j}`);
+      if (rng() < 0.15 + 0.35 * I) out.push({ kind: 'tileGone', u0: i * tw_, u1: Math.min(L, (i + 1) * tw_), v0: j * th, v1: Math.min(H, (j + 1) * th), faces: [0], delay: 0.4 + rng() * 0.4, tw, layer: 'ceramica' });
+    }
+    pushCeramic(e, out, base, 1.5 + 3 * I, 0, tw, rng, 0.3);
+  }
+  return out;
+}
+// Piso oco: uma região de peças com vazios na argamassa colante (só aparecem no corte ou sem a cerâmica).
+function pisoOco(e, s) {
+  const { L, H } = e.frame, I = state.intensity, [tw_, th] = TILE.floor;
+  const rng = mulberry32(hashStr(e.id + 'oco'));
+  const cu = L * (0.2 + 0.6 * rng()), cv = H * (0.2 + 0.6 * rng()), r = 0.9 + 1.8 * I;
+  for (let j = 0; j * th < H; j++) for (let i = 0; i * tw_ < L; i++) {
+    if (Math.hypot((i + 0.5) * tw_ - cu, (j + 0.5) * th - cv) > r * (0.75 + 0.45 * rng())) continue;
+    e.hollow.add(`${i},${j}`);
+    const a = 0.04 + 0.06 * rng(), b = 0.04 + 0.06 * rng();
+    e.voids.push({ u0: i * tw_ + a, u1: Math.min(L, (i + 1) * tw_) - b, v0: j * th + b, v1: Math.min(H, (j + 1) * th) - a });
+  }
+  return [];
+}
+function recorteCracks(e, s) {
+  const { L, H } = e.frame, I = state.intensity, tw = [{ id: s.id, w: 1 }], out = [];
+  const rng = mulberry32(hashStr(e.id + 'recorte'));
+  for (const c of columnCutouts(e.frame)) {
+    const mu = (c.u0 + c.u1) / 2, mv = (c.v0 + c.v1) / 2;
+    for (const [u, v] of [[c.u0, c.v0], [c.u1, c.v0], [c.u0, c.v1], [c.u1, c.v1]]) {
+      if (u <= 0.01 || u >= L - 0.01 || v <= 0.01 || v >= H - 0.01 || rng() > 0.4 + 0.6 * I) continue;
+      const ang = Math.atan2(Math.sign(v - mv), Math.sign(u - mu)) + (rng() - 0.5) * 0.3;
+      pushCeramic(e, out, crackPath(rng, u + Math.sign(u - mu) * 0.005, v + Math.sign(v - mv) * 0.005, ang, 0.18 + 0.25 * I, L, H, 0.25), 1.2 + 2.4 * I, rng() * 0.3, tw, rng, 0.2);
+    }
+  }
+  return out;
+}
+function setMortarVoids(e) {
+  const key = JSON.stringify(e.voids);
+  if (key === e.voidKey) return;
+  e.voidKey = key;
+  const i = e.meshes.findIndex(m => m.userData.part === 'mortar'), old = e.meshes[i];
+  root.remove(old); old.geometry.dispose();
+  const m = buildMesh({ ...e.mortarSpec, openings: e.voids }, old.material);
+  m.userData.part = 'mortar'; m.userData.id = e.id;
+  e.meshes[i] = m; root.add(m);
+  applyLayers();
+}
+
+function regen() {
+  const prev = crackedIds;
+  for (const e of entries.values()) { e.cracks = []; e.hollow = new Set(); e.voids = []; e.bump = null; }
+  const add = (e, list) => { if (e) e.cracks.push(...list); };
+  const sups = state.scen.filter(s => s.type === 'recalque' || s.type === 'esmagamento');
+  if (sups.length) for (const e of entries.values()) if (e.type === 'wall') add(e, wallSupportCracks(e, sups));
+  for (const s of state.scen) {
+    const t = entries.get(s.target);
+    if (!t) continue;
+    switch (s.type) {
+      case 'flexao': case 'cisalhamento': case 'torcao': add(t, beamCracks(t, s)); break;
+      case 'corrosao': add(t, t.type === 'beam' ? beamCorrosion(t, s) : columnCorrosion(t, s)); break;
+      case 'esmagamento': add(t, columnCrush(t, s)); break;
+      case 'tracao': add(t, columnTension(t, s)); break;
+      case 'balanco': add(t, cantileverCracks(t, s)); break;
+      case 'escalonada': case 'horizontal': case 'verga': case 'encunhamento': case 'interface':
+        add(t, wallMasonryCracks(t, s)); break;
+      case 'mapeada': case 'retracaoReboco': add(t, plasterCracks(t, s)); break;
+      case 'ceramicaFissura': if (hasCeramic(t)) add(t, ceramicCracks(t, s)); break;
+      case 'descolamento': if (hasCeramic(t)) add(t, detachCracks(t, s)); break;
+      case 'pisoOco': add(t, pisoOco(t, s)); break;
+      case 'recorte': add(t, recorteCracks(t, s)); break;
+      case 'expansao': case 'retracao':
+        for (const e of entries.values()) {
+          if (e.type === 'wall' && e.data.level === s.level - 1) {
+            add(e, wallThermalCracks(e, s));
+            // a laje arrasta o topo das paredes: sem tela, o encontro com o pilar também abre
+            if (e.data.tela === false) add(e, interfaceCracks(e, [{ id: s.id, w: 1 }], mulberry32(hashStr(e.id + 'if' + s.type)), 0.35 + 0.65 * state.intensity));
+          }
+          if (s.type === 'retracao' && (e.type === 'slab' || e.type === 'cantilever') && e.data.level === s.level) add(e, slabShrinkCracks(e, s));
+        }
+        break;
+    }
+  }
+  const order = { stain: 0, spall: 1, tileGone: 1, net: 2, line: 3 };
+  for (const e of entries.values()) {
+    if (e.type === 'floor') setMortarVoids(e);
+    e.cracks.sort((a, b) => order[a.kind] - order[b.kind]);
+    e.scenIds = new Set(e.cracks.flatMap(c => c.tw.map(t => t.id)));
+  }
+  crackedIds = new Set([...entries.values()].filter(e => e.cracks.length).map(e => e.id));
+  for (const id of new Set([...prev, ...crackedIds])) { const e = entries.get(id); if (e) redraw(e); }
+  rebuildIndicators();
+}
+
+/* ---------- fissuras: desenho ---------- */
+function progress(c) {
+  let tsum = 0, wsum = 0;
+  for (const t of c.tw) { const sc = state.scen.find(x => x.id === t.id); if (sc) { tsum += ease(sc.t) * t.w; wsum += t.w; } }
+  const te = wsum ? tsum / wsum : 1;
+  return clamp((te - c.delay) / (1 - c.delay), 0, 1);
+}
+function redraw(e) {
+  const s = e.surf, ctx = s.ctx, H = e.frame.H;
+  const cer = e.type === 'floor' || (e.type === 'wall' && state.layers.ceramica && !!e.data.ceramica);
+  const base = cer ? ensureCeramic(e) : e.type === 'wall' ? (state.layers.reboco ? s.bases.reboco : s.bases.blocos) : s.bases.concreto;
+  ctx.drawImage(base, 0, 0);
+  const useJoint = base === s.bases.blocos;
+  // fissuras de reboco só aparecem no reboco; as de cerâmica, só sobre as peças
+  const shown = c => !c.layer || (c.layer === 'ceramica' ? cer : base === s.bases.reboco);
+  if (useJoint) drawMasonryDetails(e);
+  if (e.type === 'wall' && state.layers.umidade) for (const c of e.cracks) if (shown(c)) drawDamp(e, c, progress(c));
+  for (const c of e.cracks) {
+    const f = progress(c);
+    if (f <= 0 || !shown(c)) continue;
+    for (const fi of c.faces) {
+      const r = s.regions[fi], sx = r.w / r.L, sy = r.h / H, k = sx / 120;
+      const X = u => r.x + u * sx, Y = v => r.y + r.h - v * sy;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
+      if (c.kind === 'stain') {
+        ctx.globalAlpha = f;
+        ctx.translate(X(c.u), Y(c.v)); ctx.scale(1, (c.rv * sy) / (c.ru * sx));
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, c.ru * sx);
+        g.addColorStop(0, 'rgba(132,72,32,0.55)'); g.addColorStop(1, 'rgba(132,72,32,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, c.ru * sx, 0, 2 * PI); ctx.fill();
+      } else if (c.kind === 'net') {
+        const m = Math.ceil(f * c.segs.length);
+        ctx.strokeStyle = '#2a2621'; ctx.lineWidth = Math.max(0.7, c.w * k); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        for (let i = 0; i < m; i++) c.segs[i].forEach(([u, v], q) => q ? ctx.lineTo(X(u), Y(v)) : ctx.moveTo(X(u), Y(v)));
+        ctx.stroke();
+      } else if (c.kind === 'tileGone') {   // peça desplacada: argamassa colante à mostra, com as marcas da desempenadeira
+        ctx.globalAlpha = f;
+        const x0 = X(c.u0), y0 = Y(c.v1), w = (c.u1 - c.u0) * sx, h = (c.v1 - c.v0) * sy;
+        ctx.fillStyle = '#a39d92'; ctx.fillRect(x0, y0, w, h);
+        ctx.strokeStyle = 'rgba(70,66,60,0.5)'; ctx.lineWidth = Math.max(1, 1.2 * k);
+        for (let y = y0 + 0.015 * sy; y < y0 + h; y += 0.03 * sy) { ctx.beginPath(); ctx.moveTo(x0 + 2, y); ctx.lineTo(x0 + w - 2, y); ctx.stroke(); }
+        ctx.strokeStyle = '#6d6860'; ctx.lineWidth = Math.max(1, 1.5 * k); ctx.strokeRect(x0, y0, w, h);
+      } else if (c.kind === 'spall') {
+        ctx.globalAlpha = f;
+        ctx.beginPath(); c.poly.forEach(([u, v], i) => i ? ctx.lineTo(X(u), Y(v)) : ctx.moveTo(X(u), Y(v))); ctx.closePath();
+        ctx.fillStyle = '#8d8a84'; ctx.fill();
+        ctx.strokeStyle = '#4d4a45'; ctx.lineWidth = Math.max(1, 1.4 * k); ctx.stroke();
+        ctx.clip();
+        for (const bar of c.bars) {
+          for (const [col, wmul] of [['rgba(150,80,35,0.45)', 2.2], ['#5b341d', 1]]) {
+            ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.5, c.barW * sx * wmul); ctx.lineCap = 'round';
+            ctx.beginPath(); bar.forEach(([u, v], i) => i ? ctx.lineTo(X(u), Y(v)) : ctx.moveTo(X(u), Y(v))); ctx.stroke();
+          }
+        }
+      } else {
+        // traço afinando ao longo da fissura, desenhado em trechos de até 6 segmentos
+        const pts = c.mode === 'plain' || !c.joint ? c.pts : c.mode === 'joint' || useJoint ? c.joint : c.pts;
+        const last = pts.length - 1, m = Math.floor(f * last);
+        ctx.strokeStyle = '#17140f'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for (let i = 0; i < m; i += 6) {
+          const j = Math.min(m, i + 6);
+          ctx.lineWidth = Math.max(0.8, c.w * k * (1 - 0.7 * (i + j) / 2 / last));
+          ctx.beginPath(); ctx.moveTo(X(pts[i][0]), Y(pts[i][1]));
+          for (let q = i + 1; q <= j; q++) ctx.lineTo(X(pts[q][0]), Y(pts[q][1]));
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+  }
+  if (cer) drawMarks(e);
+  s.tex.needsUpdate = true;
+}
+// Marcas de giz do teste de percussão: X vermelho = som cavo, círculo verde = som cheio.
+function drawMarks(e) {
+  const s = e.surf, ctx = s.ctx, r = s.regions[ceramicFace(e)], [tw, th] = TILE[e.type], H = e.frame.H;
+  const sx = r.w / r.L, sy = r.h / H, k = sx / 120;
+  for (const [key, val] of state.marks) {
+    const [id, si, sj] = key.split('|');
+    if (id !== e.id) continue;
+    const i = +si, j = +sj;
+    const x0 = r.x + i * tw * sx, x1 = r.x + Math.min(r.L, (i + 1) * tw) * sx;
+    const y1 = r.y + r.h - j * th * sy, y0 = r.y + r.h - Math.min(H, (j + 1) * th) * sy;
+    const p = 0.15 * Math.min(x1 - x0, y1 - y0);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
+    ctx.lineWidth = Math.max(2, 3 * k); ctx.lineCap = 'round';
+    if (val === 'cavo') {
+      ctx.strokeStyle = 'rgba(206,60,34,0.9)';
+      ctx.strokeRect(x0 + p, y0 + p, x1 - x0 - 2 * p, y1 - y0 - 2 * p);
+      ctx.beginPath(); ctx.moveTo(x0 + p, y0 + p); ctx.lineTo(x1 - p, y1 - p); ctx.moveTo(x1 - p, y0 + p); ctx.lineTo(x0 + p, y1 - p); ctx.stroke();
+    } else {
+      ctx.strokeStyle = 'rgba(36,138,70,0.9)';
+      ctx.beginPath(); ctx.arc((x0 + x1) / 2, (y0 + y1) / 2, Math.min(x1 - x0, y1 - y0) * 0.18, 0, 2 * PI); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/* ---------- teste de percussão (Web Audio, sem arquivos) ---------- */
+let actx = null;
+function knock(hollow) {
+  actx ||= new (window.AudioContext || window.webkitAudioContext)();
+  const t = actx.currentTime, out = actx.createGain();
+  out.gain.value = 0.7; out.connect(actx.destination);
+  // impacto: ruído curto filtrado (seco e agudo na peça aderida; ressonante e grave na oca)
+  const len = Math.floor(actx.sampleRate * (hollow ? 0.12 : 0.04)), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, hollow ? 2 : 4);
+  const src = actx.createBufferSource(), bp = actx.createBiquadFilter(), ng = actx.createGain();
+  src.buffer = buf; bp.type = 'bandpass'; bp.frequency.value = hollow ? 650 : 2600; bp.Q.value = hollow ? 7 : 1.1;
+  ng.gain.value = hollow ? 0.9 : 0.8;
+  src.connect(bp).connect(ng).connect(out); src.start(t);
+  // corpo: parciais senoidais com decaimento curto (cheio) ou longo (cavo)
+  const parts = hollow ? [[290, 0.5, 0.32], [470, 0.32, 0.24], [760, 0.18, 0.16]] : [[1150, 0.22, 0.035], [1900, 0.12, 0.025]];
+  for (const [f, a, dec] of parts) {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.setValueAtTime(f, t);
+    if (hollow) o.frequency.exponentialRampToValueAtTime(f * 0.9, t + dec);
+    g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(0.0008, t + dec);
+    o.connect(g).connect(out); o.start(t); o.stop(t + dec + 0.02);
+  }
+}
+
+// Alvenaria sem reboco: vergas/contravergas (curtas quando há falha) e ferro-cabelo nos encontros com pilares.
+function drawMasonryDetails(e) {
+  const s = e.surf, ctx = s.ctx, { L, H, openings = [], colStart, colEnd } = e.frame;
+  const sx = s.w / L, sy = s.h / H, X = u => u * sx, Y = v => s.h - v * sy;
+  const fail = state.scen.some(x => x.type === 'verga' && x.target === e.id);
+  const ext = fail ? 0.05 : 0.3;
+  const band = (u0, u1, v0, v1) => {
+    u0 = Math.max(0, u0); u1 = Math.min(L, u1); v1 = Math.min(H, v1);
+    if (u1 <= u0 || v1 <= v0) return;
+    ctx.fillStyle = '#b7babc'; ctx.fillRect(X(u0), Y(v1), (u1 - u0) * sx, (v1 - v0) * sy);
+    ctx.strokeStyle = '#85898c'; ctx.lineWidth = 1; ctx.strokeRect(X(u0), Y(v1), (u1 - u0) * sx, (v1 - v0) * sy);
+  };
+  for (const o of openings) {
+    band(o.u0 - ext, o.u1 + ext, o.v1, o.v1 + 0.1);
+    if (o.v0 > 0.05) band(o.u0 - ext, o.u1 + ext, o.v0 - 0.1, o.v0);
+  }
+  if (e.data.tela !== false) {
+    ctx.strokeStyle = '#3f454c'; ctx.lineWidth = Math.max(1.5, 0.008 * sx); ctx.lineCap = 'round';
+    for (const [has, u0, u1] of [[colStart, 0, 0.5], [colEnd, L, L - 0.5]]) {
+      if (!has) continue;
+      for (let v = 0.4; v < H - 0.1; v += 0.4) { ctx.beginPath(); ctx.moveTo(X(u0), Y(v)); ctx.lineTo(X(u1), Y(v)); ctx.stroke(); }
+    }
+  }
+}
+// Mancha de umidade ao longo e abaixo de uma fissura de parede (água escorrendo pela face).
+function drawDamp(e, c, f) {
+  if (c.kind !== 'line' || f <= 0.15 || c.w < 1) return;   // microfissuras capilares não infiltram
+  const s = e.surf, ctx = s.ctx, sx = s.w / e.frame.L, sy = s.h / e.frame.H;
+  const blot = (u, v, ru, rv, a) => {
+    ctx.save();
+    ctx.translate(u * sx, s.h - v * sy); ctx.scale(1, (rv * sy) / (ru * sx));
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, ru * sx);
+    g.addColorStop(0, `rgba(78,84,74,${a})`); g.addColorStop(0.6, `rgba(92,96,84,${a * 0.5})`); g.addColorStop(1, 'rgba(92,96,84,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, ru * sx, 0, 2 * PI); ctx.fill();
+    ctx.restore();
+  };
+  const m = Math.floor(f * (c.pts.length - 1)), a = 0.3 * f;
+  let low = c.pts[0];
+  for (let i = 0; i <= m; i += 8) {
+    const p = c.pts[i];
+    blot(p[0], p[1] - 0.05, 0.13, 0.17, a);
+    if (p[1] < low[1]) low = p;
+  }
+  blot(low[0], Math.max(0.15, low[1] - 0.3), 0.2, 0.42, a * 1.1);
+}
+
+/* ---------- indicadores (setas de carga, recalque, movimentação) ---------- */
+function arrow(from, dir, len, color) {
+  const a = new THREE.ArrowHelper(dir.clone().normalize(), from, len, color, Math.min(0.22, len * 0.4), 0.12);
+  for (const m of [a.line.material, a.cone.material]) { m.depthTest = false; m.transparent = true; }
+  a.renderOrder = 10; a.line.renderOrder = a.cone.renderOrder = 10;
+  return a;
+}
+function rebuildIndicators() {
+  indicators.clear();
+  const down = V3(0, -1, 0), up = V3(0, 1, 0), red = 0xc0392b, orange = 0xd9822b, pd = state.model.pd;
+  for (const s of state.scen) {
+    const add = (p, d, l, c = red) => indicators.add(arrow(p, d, l, c));
+    if (s.type === 'recalque') { const c = colMap.get(s.target); add(V3(c.x, -0.85, c.z), down, 0.7); }
+    else if (s.type === 'esmagamento') { const c = colMap.get(s.target); add(V3(c.x, CRUSH_Y1 + 0.75, c.z), down, 0.6); add(V3(c.x, CRUSH_Y0 - 0.75, c.z), up, 0.6); }
+    else if (s.type === 'tracao') { const c = colMap.get(s.target); add(V3(c.x, pd - 0.9, c.z), up, 0.6); add(V3(c.x, 0.9, c.z), down, 0.6); }
+    else if (s.type === 'flexao' || s.type === 'cisalhamento') {
+      const b = beamInfo.get(s.target), fr = s.type === 'flexao' ? [0.2, 0.35, 0.5, 0.65, 0.8] : [0.22, 0.78];
+      for (const r of fr) add(V3(b.x1 + b.dx * b.Lc * r, b.ytop + 0.85, b.z1 + b.dz * b.Lc * r), down, 0.75);
+    } else if (s.type === 'torcao') {
+      const b = beamInfo.get(s.target), nx = b.dz, nz = -b.dx, ym = b.ytop - b.h / 2;
+      for (const r of [0.2, 0.8]) {
+        const x = b.x1 + b.dx * b.Lc * r, z = b.z1 + b.dz * b.Lc * r, sg = r < 0.5 ? 1 : -1;
+        add(V3(x + nx * 0.3 * sg, ym + 0.45, z + nz * 0.3 * sg), down, 0.55);
+        add(V3(x - nx * 0.3 * sg, ym - 0.45, z - nz * 0.3 * sg), up, 0.55);
+      }
+    } else if (s.type === 'balanco') {
+      const c = cantInfo.get(s.target);
+      for (const r of [0.2, 0.5, 0.8]) {
+        const x = c.axis === 'z' ? c.x0 + (c.x1 - c.x0) * r : c.at + c.out * c.len * 0.9;
+        const z = c.axis === 'z' ? c.at + c.out * c.len * 0.9 : c.z0 + (c.z1 - c.z0) * r;
+        add(V3(x, c.ytop + 0.8, z), down, 0.7);
+      }
+    } else if (s.type === 'expansao' || s.type === 'retracao') {
+      const b = bounds, y = s.level * pd + 0.15, cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, out = s.type === 'expansao';
+      for (const [x, z, d] of [[b.x0, cz, V3(-1, 0, 0)], [b.x1, cz, V3(1, 0, 0)], [cx, b.z0, V3(0, 0, -1)], [cx, b.z1, V3(0, 0, 1)]]) {
+        const p = V3(x, y, z);
+        if (out) add(p.addScaledVector(d, 0.15), d, 0.7, orange);
+        else add(p.addScaledVector(d, 0.9), d.clone().negate(), 0.7, orange);
+      }
+    }
+  }
+}
+
+/* ---------- camadas e corte ---------- */
+function applyLayers() {
+  const L = state.layers;
+  for (const e of entries.values()) for (const m of e.meshes) {
+    if (e.type === 'wall') m.visible = L.alvenaria;
+    // sem a cerâmica, a argamassa colante fica à mostra (com os vazios do piso oco)
+    else if (e.type === 'floor') m.visible = m.userData.part ? L.estrutura : L.ceramica;
+    else m.visible = L.estrutura;
+  }
+}
+function applyCut() {
+  const c = state.cut, b = bounds;
+  if (b) {
+    if (c.axis === 'x') { const p = b.x0 - 0.5 + c.frac * (b.x1 - b.x0 + 1); cutPlane.set(V3(1, 0, 0), -p); }
+    else if (c.axis === 'z') { const p = b.z0 - 1.5 + c.frac * (b.z1 - b.z0 + 2); cutPlane.set(V3(0, 0, 1), -p); }
+    else { const p = 0.02 + c.frac * (b.y1 + 0.3); cutPlane.set(V3(0, -1, 0), p); }
+  }
+  for (const e of entries.values()) for (const m of e.materials) {
+    const want = c.on ? [cutPlane] : [];
+    if (m.clippingPlanes?.length !== want.length) { m.clippingPlanes = want; m.needsUpdate = true; }
+  }
+}
+
+/* ---------- seleção e destaque ---------- */
+function paintHighlight() {
+  for (const e of entries.values()) {
+    const sel = e.id === state.sel, hov = e.id === state.hover;
+    for (const m of e.materials) {
+      m.emissive.set(sel || hov ? 0x2f6fd6 : 0x000000);
+      m.emissiveIntensity = sel ? 0.45 : hov ? 0.18 : 0;
+    }
+  }
+}
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pickHit(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects(root.children.filter(m => m.visible), false);
+  for (const h of hits) if (!state.cut.on || cutPlane.distanceToPoint(h.point) >= 0) return h;
+  return null;
+}
+const pick = ev => pickHit(ev)?.object.userData.id ?? null;
+const toastEl = $('#toast');
+let toastTimer = 0;
+function toast(ev, text) {
+  const r = vp.getBoundingClientRect();
+  toastEl.textContent = text; toastEl.style.left = (ev.clientX - r.left) + 'px'; toastEl.style.top = (ev.clientY - r.top) + 'px';
+  toastEl.style.display = 'block'; clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.style.display = 'none', 1400);
+}
+// Clique em peça cerâmica com o teste de percussão ligado: toca o som e marca a peça.
+function percuss(hit, ev) {
+  const e = entries.get(hit.object.userData.id);
+  const ok = e.type === 'floor' ? !hit.object.userData.part : e.type === 'wall' && !!e.data.ceramica && state.layers.ceramica;
+  if (!ok) return false;
+  const p = hit.point.clone().sub(e.frame.origin);
+  const [i, j] = tileOf(e, p.dot(e.frame.U), p.dot(e.frame.V));
+  const hollow = e.hollow?.has(`${i},${j}`);
+  knock(hollow);
+  state.marks.set(`${e.id}|${i}|${j}`, hollow ? 'cavo' : 'cheio');
+  redraw(e);
+  toast(ev, hollow ? 'Som cavo: vazio sob a peça' : 'Som cheio: peça aderida');
+  return true;
+}
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', ev => { downAt = [ev.clientX, ev.clientY]; });
+renderer.domElement.addEventListener('pointerup', ev => {
+  if (!downAt || ev.button !== 0) return;
+  if (Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5) return;
+  const hit = pickHit(ev);
+  if (ed.on) { edit3DClick(hit); return; }
+  if (state.percussao && hit && percuss(hit, ev)) return;
+  state.sel = hit ? hit.object.userData.id : null; paintHighlight(); renderPanel();
+});
+const tip = $('#tip');
+renderer.domElement.addEventListener('pointermove', ev => {
+  if (ev.buttons) { tip.style.display = 'none'; return; }
+  const id = pick(ev);
+  if (id !== state.hover) { state.hover = id; paintHighlight(); }
+  if (id) {
+    const e = entries.get(id), r = vp.getBoundingClientRect();
+    tip.textContent = `${TYPE_LABEL[e.type]} ${id}`;
+    tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px';
+    tip.style.display = 'block'; renderer.domElement.style.cursor = state.percussao ? 'crosshair' : 'pointer';
+  } else { tip.style.display = 'none'; renderer.domElement.style.cursor = state.percussao ? 'crosshair' : ''; }
+});
+renderer.domElement.addEventListener('pointerleave', () => { tip.style.display = 'none'; state.hover = null; paintHighlight(); });
+addEventListener('keydown', ev => { if (ev.key === 'Escape') { state.sel = null; paintHighlight(); renderPanel(); } });
+
+/* ---------- cenários ---------- */
+// Cenários de laje (expansão/retração) valem para o nível inteiro: um por nível.
+const sameScen = (s, type, target) => s.type === type &&
+  (SCEN[type].level ? s.level === entries.get(target).data.level : s.target === target);
+function makeScen(type, target) {
+  const s = { id: ++scenSeq, type, target, t: 0 };
+  if (SCEN[type].level) s.level = entries.get(target).data.level;
+  return s;
+}
+function toggleScenario(type, target) {
+  const i = state.scen.findIndex(s => sameScen(s, type, target));
+  if (i >= 0) state.scen.splice(i, 1);
+  else state.scen.push(makeScen(type, target));
+  regen(); needDeform = true; renderPanel();
+}
+function removeScenario(id) {
+  state.scen = state.scen.filter(s => s.id !== id);
+  regen(); needDeform = true; renderPanel();
+}
+function resetScenarios() {
+  state.scen = []; state.marks.clear();
+  regen(); needDeform = true; renderPanel();
+  for (const e of entries.values()) if (hasCeramic(e)) redraw(e);
+}
+
+/* ---------- painel ---------- */
+function props(e) {
+  const d = e.data, f = e.frame, pd = state.model.pd;
+  const rows = [];
+  if (e.type === 'column') rows.push(['Seção', `${fmt(d.b * 100, 0)} × ${fmt(d.h * 100, 0)} cm`], ['Posição', `x ${fmt(d.x)} · z ${fmt(d.z)} m`], ['Altura', `${fmt(state.model.floors * pd)} m + fundação`]);
+  if (e.type === 'beam') rows.push(['Nível', d.level === 0 ? 'Baldrame' : `${floorName(d.level)} (${fmt(d.level * pd)} m)`], ['Vão', `${fmt(beamInfo.get(d.id).Lc)} m (eixo a eixo)`], ['Seção', `${fmt(d.b * 100, 0)} × ${fmt(d.h * 100, 0)} cm`]);
+  if (e.type === 'slab' || e.type === 'cantilever') rows.push(['Nível', `${fmt(d.level * pd)} m`], ['Dimensões', `${fmt(f.L)} × ${fmt(f.H)} m`], ['Espessura', `${fmt(d.t * 100, 0)} cm`]);
+  if (e.type === 'cantilever') rows.push(['Balanço', `${fmt(cantInfo.get(d.id).len)} m`]);
+  if (e.type === 'wall') {
+    const op = d.openings || [], np = op.filter(o => o.type === 'porta').length, nj = op.length - np;
+    rows.push(['Pavimento', floorName(d.level)], ['Pano', `${fmt(f.L)} × ${fmt(f.H)} m`], ['Aberturas', op.length ? [np && `${np} porta${np > 1 ? 's' : ''}`, nj && `${nj} janela${nj > 1 ? 's' : ''}`].filter(Boolean).join(', ') : 'nenhuma']);
+  }
+  if (e.type === 'wall' && d.ceramica) rows.push(['Revestimento', 'Azulejo 30 × 40 cm']);
+  if (e.type === 'floor') rows.push(['Área', `${fmt(f.L * f.H, 1)} m²`], ['Revestimento', 'Porcelanato 60 × 60 cm'], ['Camadas', 'contrapiso · argamassa colante · peça']);
+  return rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+}
+const scenTargetLabel = s => {
+  const e = entries.get(s.target);
+  return SCEN[s.type].level ? `Laje do nível ${fmt(s.level * state.model.pd)} m` : `${TYPE_LABEL[e.type]} ${s.target}`;
+};
+function renderPanel() {
+  const e = state.sel && entries.get(state.sel);
+  let h;
+  if (!e) {
+    h = `<h3>Elemento</h3><p class="hint"><b>Clique num elemento</b> do modelo (pilar, viga, laje, balanço, alvenaria ou piso) para ver as ações possíveis. Vários cenários podem ser combinados.</p>`;
+  } else {
+    const acts = Object.entries(SCEN).filter(([, s]) => s.targets.includes(e.type)).map(([k, s]) => {
+      const on = state.scen.some(x => sameScen(x, k, e.id));
+      if (s.needsOpening && !(e.frame.openings || []).length)
+        return `<button class="act" disabled><span class="dot"></span>${s.action}<span class="badge">sem aberturas</span></button>`;
+      if (s.needsCeramic && !hasCeramic(e))
+        return `<button class="act" disabled><span class="dot"></span>${s.action}<span class="badge">sem cerâmica</span></button>`;
+      return `<button class="act${on ? ' on' : ''}" data-act="${k}" title="${s.config}"><span class="dot"></span>${s.action}${s.level ? '<span class="badge">nível todo</span>' : ''}</button>`;
+    }).join('');
+    const fut = (FUTURE[e.type] || []).map(([l, st]) => `<button class="act" disabled><span class="dot"></span>${l}<span class="badge">etapa ${st}</span></button>`).join('');
+    const tela = e.type === 'wall' && (e.frame.colStart || e.frame.colEnd)
+      ? `<label class="toggle"><input type="checkbox" data-tela ${e.data.tela !== false ? 'checked' : ''}> Tela / ferro-cabelo no encontro com os pilares</label>` : '';
+    const cerT = e.type === 'wall' ? `<label class="toggle"><input type="checkbox" data-cer ${e.data.ceramica ? 'checked' : ''}> Revestimento cerâmico nesta parede</label>` : '';
+    h = `<div class="selhead"><span class="tag">${TYPE_LABEL[e.type]}</span><h2>${e.id}</h2><button class="x" data-desel title="Fechar">×</button></div>
+      <dl>${props(e)}</dl>${tela}${cerT}<h3>Ações</h3><div class="actions">${acts}${fut}</div>`;
+  }
+  $('#selBox').innerHTML = h;
+  $('#scenList').innerHTML = state.scen.length
+    ? `<div class="chips">${state.scen.map(s => `<div class="chip"><span>${SCEN[s.type].label}<br><small>${scenTargetLabel(s)}</small></span><button data-rm="${s.id}" title="Remover">×</button></div>`).join('')}</div>`
+    : `<p class="empty">Nenhum cenário aplicado.</p>`;
+  const types = [...new Set(state.scen.map(s => s.type))];
+  if (e) for (const [k, s] of Object.entries(SCEN)) if (s.targets.includes(e.type) && !types.includes(k)) types.push(k);
+  const cards = types.map(k => SCEN[k]);
+  if (state.layers.umidade) cards.push(INFILTRACAO);
+  if (state.percussao) cards.unshift(PERCUSSAO);
+  $('#legend').innerHTML = cards.length
+    ? cards.map(c => `<div class="legend"><b>${c.label}</b><p><em>Causa provável:</em> ${c.causa}</p><p><em>Configuração típica:</em> ${c.config}</p></div>`).join('')
+    : `<p class="empty">A legenda aparece ao selecionar um elemento ou aplicar um cenário.</p>`;
+}
+$('#panel').addEventListener('change', ev => {
+  const ds = ev.target.dataset, e = entries.get(state.sel);
+  if ('tela' in ds) { e.data.tela = ev.target.checked; regen(); redraw(e); }
+  else if ('cer' in ds) {
+    e.data.ceramica = ev.target.checked;
+    if (!e.data.ceramica) state.scen = state.scen.filter(s => !(s.target === e.id && SCEN[s.type].needsCeramic));
+    regen(); needDeform = true; redraw(e); renderPanel();
+  }
+});
+$('#panel').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.act) toggleScenario(b.dataset.act, state.sel);
+  else if (b.dataset.rm) removeScenario(+b.dataset.rm);
+  else if ('desel' in b.dataset) { state.sel = null; paintHighlight(); renderPanel(); }
+});
+
+/* ---------- controles ---------- */
+$('#rInt').addEventListener('input', ev => { state.intensity = +ev.target.value; regen(); needDeform = true; });
+$('#rExag').addEventListener('input', ev => { state.exag = +ev.target.value; needDeform = true; });
+for (const r of document.querySelectorAll('input[name=vinc]')) r.addEventListener('change', ev => {
+  state.model.vinculo = ev.target.value; $('#vincNote').textContent = VINC_NOTE[ev.target.value];
+  regen(); needDeform = true;
+});
+$('#cEst').addEventListener('change', ev => { state.layers.estrutura = ev.target.checked; applyLayers(); });
+$('#cAlv').addEventListener('change', ev => { state.layers.alvenaria = ev.target.checked; applyLayers(); });
+$('#cReb').addEventListener('change', ev => { state.layers.reboco = ev.target.checked; for (const e of entries.values()) if (e.type === 'wall') redraw(e); });
+$('#cCer').addEventListener('change', ev => {
+  state.layers.ceramica = ev.target.checked; applyLayers();
+  for (const e of entries.values()) if (e.type === 'wall' && e.data.ceramica) redraw(e);
+});
+$('#bKnock').addEventListener('click', () => {
+  state.percussao = !state.percussao;
+  $('#bKnock').classList.toggle('on', state.percussao);
+  renderer.domElement.style.cursor = state.percussao ? 'crosshair' : '';
+  $('#help').textContent = state.percussao
+    ? 'Teste de percussão ligado: clique numa peça cerâmica (piso ou parede revestida) para ouvir o som'
+    : 'Arraste para girar · botão direito para mover · roda para zoom · clique num elemento';
+  renderPanel();
+});
+$('#cUmi').addEventListener('change', ev => { state.layers.umidade = ev.target.checked; for (const e of entries.values()) if (e.type === 'wall') redraw(e); renderPanel(); });
+$('#cCut').addEventListener('change', ev => { state.cut.on = ev.target.checked; applyCut(); });
+$('#sAxis').addEventListener('change', ev => { state.cut.axis = ev.target.value; applyCut(); });
+$('#rCut').addEventListener('input', ev => { state.cut.frac = +ev.target.value; applyCut(); });
+$('#bReset').addEventListener('click', resetScenarios);
+$('#bView').addEventListener('click', homeView);
+
+function homeView() {
+  const b = bounds, cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
+  controls.target.set(cx, b.y1 * 0.45, cz);
+  const span = Math.max(b.x1 - b.x0, b.z1 - b.z0, b.y1);
+  camera.position.set(cx - span * 1.25, b.y1 * 0.45 + span * 1.05, cz - span * 1.75);
+  sun.target.position.set(cx, 0, cz);
+  controls.update();
+}
+
+/* ---------- salvar / abrir ---------- */
+$('#bSave').addEventListener('click', () => {
+  const data = {
+    app: 'simulador-visual-fissuras', version: 2, model: state.model,
+    scenarios: state.scen.map(s => ({ type: s.type, target: s.target })),
+    settings: { intensity: state.intensity, exag: state.exag, layers: state.layers }
+  };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = (state.model.name || 'modelo').replace(/[^\w\-]+/g, '_') + '.json';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('#bOpen').addEventListener('click', () => $('#fileIn').click());
+$('#fileIn').addEventListener('change', async ev => {
+  const f = ev.target.files[0]; ev.target.value = '';
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const m = data.model || data;
+    if (!Array.isArray(m.columns) || !Array.isArray(m.beams) || !Array.isArray(m.walls) || !m.pd || !m.floors) throw new Error('estrutura do modelo incompleta');
+    m.slabs ||= []; m.pisos ||= [];
+    if (data.settings) {
+      state.intensity = data.settings.intensity ?? state.intensity; state.exag = data.settings.exag ?? state.exag;
+      Object.assign(state.layers, data.settings.layers || {});
+      $('#rInt').value = state.intensity; $('#rExag').value = state.exag;
+      $('#cEst').checked = state.layers.estrutura; $('#cAlv').checked = state.layers.alvenaria; $('#cReb').checked = state.layers.reboco;
+      $('#cUmi').checked = !!state.layers.umidade;
+      state.layers.ceramica = state.layers.ceramica !== false; $('#cCer').checked = state.layers.ceramica;
+    }
+    state.scen = []; state.marks.clear();
+    buildScene(m);
+    for (const s of data.scenarios || []) {
+      const t = entries.get(s.target);
+      if (SCEN[s.type] && t && SCEN[s.type].targets.includes(t.type) && !state.scen.some(x => sameScen(x, s.type, s.target)))
+        state.scen.push(makeScen(s.type, s.target));
+    }
+    regen(); needDeform = true; homeView(); renderPanel();
+    if (ed.on) { state.scen = []; regen(); ed.sel = null; ed.undo = []; ed.redo = []; ed.level = 0; syncLevels(); fitPlan(); renderEditPanel(); drawPlan(); }
+  } catch (err) { alert('Não foi possível abrir o arquivo: ' + err.message); }
+});
+
+/* ---------- modo de edição ---------- */
+// Pavimento em edição: -1 = baldrame (vigas de fundação); n ≥ 0 = paredes do pavimento n
+// com as vigas e lajes do seu teto (nível n+1). Pilares valem para todos os pavimentos.
+const ed = { on: false, view: 'planta', level: 0, tool: 'select', snap: 0.1, sel: null, hover: null, undo: [], redo: [], drag: null, s: 50, ox: 0, oy: 0, cur: null, flashUntil: 0 };
+const planCv = $('#plan'), pctx = planCv.getContext('2d');
+const TOOL_HINT = {
+  select: 'Clique para selecionar · arraste para mover · arraste as alças para redimensionar · Delete apaga',
+  column: 'Clique para inserir um pilar 20 × 20 cm (encaixa na grade)',
+  beam: 'Arraste do início ao fim da viga · encaixa em pilares e pontas · Shift trava na horizontal/vertical',
+  wall: 'Arraste do início ao fim da parede · encaixa em pilares e pontas · Shift trava na horizontal/vertical',
+  slab: 'Arraste um retângulo: laje do teto deste pavimento',
+  cantilever: 'Arraste um retângulo encostado no contorno da edificação: balanço do teto deste pavimento',
+  piso: 'Arraste um retângulo: piso cerâmico do térreo',
+  porta: 'Clique sobre uma parede para inserir uma porta 0,80 × 2,10 m',
+  janela: 'Clique sobre uma parede para inserir uma janela 1,20 × 1,00 m (peitoril 1,10 m)',
+  delete: 'Clique num elemento para apagá-lo'
+};
+const KEYS = { v: 'select', p: 'column', b: 'beam', w: 'wall', l: 'slab', k: 'cantilever', f: 'piso', d: 'porta', j: 'janela', x: 'delete' };
+const KIND_LABEL = { column: 'Pilar', beam: 'Viga', wall: 'Parede', slab: 'Laje', piso: 'Piso', opening: 'Abertura' };
+const M = () => state.model;
+const r3 = v => Math.round(v * 1000) / 1000;
+const esc = s => String(s).replace(/[&"<>]/g, c => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' }[c]));
+const listOf = kind => ({ column: M().columns, beam: M().beams, wall: M().walls, opening: M().walls, slab: M().slabs, piso: M().pisos }[kind]);
+const elOf = sel => sel ? listOf(sel.kind).find(e => e.id === sel.id) : null;
+const beamLevel = () => ed.level < 0 ? 0 : ed.level + 1;
+function selFromEntry(id) {
+  const e = entries.get(id);
+  return e ? { kind: { column: 'column', beam: 'beam', wall: 'wall', slab: 'slab', cantilever: 'slab', floor: 'piso' }[e.type], id } : null;
+}
+function newId(prefix, pad = 0) {
+  const m = M(), ids = new Set([...m.columns, ...m.beams, ...m.walls, ...m.slabs, ...m.pisos].map(e => e.id));
+  for (let n = 1; ; n++) { const id = prefix + String(n).padStart(pad, '0'); if (!ids.has(id)) return id; }
+}
+function segInfo(e) { const dx = e.x2 - e.x1, dz = e.z2 - e.z1, len = Math.hypot(dx, dz) || 1e-9; return { dx: dx / len, dz: dz / len, len }; }
+
+/* desfazer / refazer: fotografias do modelo em JSON */
+const snapshot = () => JSON.stringify(M());
+function pushUndo(snap = snapshot()) { ed.undo.push(snap); if (ed.undo.length > 60) ed.undo.shift(); ed.redo = []; }
+function restore(json) { state.model = JSON.parse(json); ed.sel = null; ed.level = Math.min(ed.level, state.model.floors - 1); rebuild3D(); syncLevels(); renderEditPanel(); drawPlan(); }
+function undo() { if (ed.undo.length) { ed.redo.push(snapshot()); restore(ed.undo.pop()); } }
+function redo() { if (ed.redo.length) { ed.undo.push(snapshot()); restore(ed.redo.pop()); } }
+
+// Mantém o modelo coerente depois de qualquer edição.
+function sanitize() {
+  const m = M(), len = e => Math.hypot(e.x2 - e.x1, e.z2 - e.z1);
+  m.floors = clamp(Math.round(m.floors) || 1, 1, 6); m.pd = clamp(+m.pd || 2.8, 2.2, 5);
+  for (const c of m.columns) { c.b = Math.max(0.1, c.b); c.h = Math.max(0.1, c.h); }
+  m.beams = m.beams.filter(b => b.level >= 0 && b.level <= m.floors && len(b) >= 0.2);
+  for (const b of m.beams) { b.b = Math.max(0.1, b.b); b.h = clamp(b.h, 0.15, m.pd - 1); }
+  m.walls = m.walls.filter(w => w.level >= 0 && w.level < m.floors && len(w) >= 0.2);
+  for (const r of [...m.slabs, ...m.pisos]) {
+    if (r.x0 > r.x1) [r.x0, r.x1] = [r.x1, r.x0];
+    if (r.z0 > r.z1) [r.z0, r.z1] = [r.z1, r.z0];
+  }
+  m.slabs = m.slabs.filter(s => s.level >= 1 && s.level <= m.floors && s.x1 - s.x0 >= 0.2 && s.z1 - s.z0 >= 0.2);
+  for (const s of m.slabs) s.t = clamp(s.t, 0.05, 0.4);
+  m.pisos = m.pisos.filter(p => p.x1 - p.x0 >= 0.2 && p.z1 - p.z0 >= 0.2);
+  for (const w of m.walls) {
+    const L = len(w);
+    w.t = clamp(w.t, 0.05, 0.4);
+    w.openings = (w.openings || []).filter(o => o.width <= L - 0.2).map(o => {
+      o.width = Math.max(0.3, o.width); o.height = clamp(o.height, 0.3, m.pd - 0.3); o.sill = o.type === 'porta' ? 0 : clamp(o.sill, 0, m.pd - 0.3 - o.height);
+      o.pos = r3(clamp(o.pos, 0.1, L - o.width - 0.1));
+      return o;
+    });
+  }
+}
+function rebuild3D() { sanitize(); buildScene(M()); state.sel = ed.sel ? ed.sel.id : null; paintHighlight(); }
+function commit() { rebuild3D(); if (ed.sel && !elOf(ed.sel)) ed.sel = null; renderEditPanel(); drawPlan(); }
+function afterSelect() { state.sel = ed.sel ? ed.sel.id : null; paintHighlight(); renderEditPanel(); drawPlan(); }
+function flash(msg) { ed.flashUntil = performance.now() + 2500; const h = $('#edhint'); h.textContent = msg; h.classList.add('flash'); setTimeout(updateHint, 2600); }
+function updateHint() {
+  if (performance.now() < ed.flashUntil) return;
+  const h = $('#edhint'); h.classList.remove('flash');
+  let t = ed.view === '3d' ? 'Vista 3D: clique para selecionar e edite as medidas no painel · o desenho é feito na planta' : TOOL_HINT[ed.tool];
+  const d = ed.drag;
+  if (d && (d.type === 'draw' || d.type === 'rect')) {
+    const dx = d.b[0] - d.a[0], dz = d.b[1] - d.a[1];
+    t = d.type === 'draw' ? `Comprimento ${fmt(Math.hypot(dx, dz))} m` : `${fmt(Math.abs(dx))} × ${fmt(Math.abs(dz))} m`;
+  }
+  if (ed.cur && ed.view === 'planta') t += ` · x ${fmt(ed.cur[0])} · z ${fmt(ed.cur[1])} m`;
+  h.textContent = t;
+}
+
+/* planta: transformação mundo ↔ tela (x para a direita, z para cima; a fachada z = 0 fica embaixo) */
+const toS = (x, z) => [ed.ox + x * ed.s, ed.oy - z * ed.s];
+const toW = (px, py) => [(px - ed.ox) / ed.s, (ed.oy - py) / ed.s];
+function fitPlan() {
+  const m = M(), b = modelBounds(m), W = planCv.clientWidth || vp.clientWidth, H = planCv.clientHeight || vp.clientHeight;
+  for (const e of [...m.walls, ...m.beams]) { b.x0 = Math.min(b.x0, e.x1, e.x2); b.x1 = Math.max(b.x1, e.x1, e.x2); b.z0 = Math.min(b.z0, e.z1, e.z2); b.z1 = Math.max(b.z1, e.z1, e.z2); }
+  for (const r of [...m.slabs, ...m.pisos]) { b.x0 = Math.min(b.x0, r.x0); b.x1 = Math.max(b.x1, r.x1); b.z0 = Math.min(b.z0, r.z0); b.z1 = Math.max(b.z1, r.z1); }
+  ed.s = clamp(Math.min(W / (b.x1 - b.x0 + 4), (H - 110) / (b.z1 - b.z0 + 4)), 8, 400);
+  ed.ox = W / 2 - (b.x0 + b.x1) / 2 * ed.s; ed.oy = (H + 20) / 2 + (b.z0 + b.z1) / 2 * ed.s;
+}
+function snapXZ(x, z, ends = false, excl = null) {
+  const m = M(), tol = 10 / ed.s;
+  for (const c of m.columns) if (Math.hypot(c.x - x, c.z - z) < tol) return [c.x, c.z];
+  if (ends) for (const e of [...m.walls, ...m.beams]) if (e !== excl)
+    for (const [px, pz] of [[e.x1, e.z1], [e.x2, e.z2]]) if (Math.hypot(px - x, pz - z) < tol) return [px, pz];
+  const g = ed.snap;
+  return [r3(Math.round(x / g) * g), r3(Math.round(z / g) * g)];
+}
+const ortho = (a, b) => Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]) ? [b[0], a[1]] : [a[0], b[1]];
+
+function hitPlan(x, z) {
+  const m = M(), tol = 6 / ed.s, lv = ed.level;
+  const inR = r => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1;
+  if (lv >= 0) for (const w of m.walls) {
+    if (w.level !== lv) continue;
+    const { dx, dz } = segInfo(w), u = (x - w.x1) * dx + (z - w.z1) * dz;
+    if (Math.abs((x - w.x1) * dz - (z - w.z1) * dx) > w.t / 2 + tol) continue;
+    const oi = (w.openings || []).findIndex(o => u >= o.pos && u <= o.pos + o.width);
+    if (oi >= 0) return { kind: 'opening', id: w.id, oi };
+  }
+  for (const c of m.columns) if (Math.abs(x - c.x) <= c.b / 2 + tol && Math.abs(z - c.z) <= c.h / 2 + tol) return { kind: 'column', id: c.id };
+  if (lv >= 0) for (const w of m.walls) if (w.level === lv && distPointSeg(x, z, w.x1, w.z1, w.x2, w.z2) <= w.t / 2 + tol) return { kind: 'wall', id: w.id };
+  for (const b of m.beams) if (b.level === beamLevel() && distPointSeg(x, z, b.x1, b.z1, b.x2, b.z2) <= b.b / 2 + tol) return { kind: 'beam', id: b.id };
+  if (lv >= 0) {
+    const sl = m.slabs.filter(s => s.level === lv + 1);
+    for (const s of [...sl.filter(s => s.kind === 'balanco'), ...sl.filter(s => s.kind !== 'balanco')]) if (inR(s)) return { kind: 'slab', id: s.id };
+  }
+  if (lv <= 0) for (const p of m.pisos) if (inR(p)) return { kind: 'piso', id: p.id };
+  return null;
+}
+function handlesOf(sel) {
+  const e = elOf(sel);
+  if (!e || sel.kind === 'opening' || sel.kind === 'column') return [];
+  if (sel.kind === 'wall' || sel.kind === 'beam') return [{ k: 1, x: e.x1, z: e.z1 }, { k: 2, x: e.x2, z: e.z2 }];
+  return [['x0', 'z0'], ['x1', 'z0'], ['x1', 'z1'], ['x0', 'z1']].map(([a, b]) => ({ k: a + b, ax: a, az: b, x: e[a], z: e[b] }));
+}
+function hitHandle(px, py) {
+  for (const h of handlesOf(ed.sel)) { const [sx, sy] = toS(h.x, h.z); if (Math.abs(sx - px) <= 7 && Math.abs(sy - py) <= 7) return h; }
+  return null;
+}
+// Pontas de vigas e paredes apoiadas num pilar acompanham o pilar quando ele é movido.
+function attachedTo(c) {
+  const out = [];
+  for (const e of [...M().walls, ...M().beams]) for (const k of [1, 2])
+    if (Math.hypot(e['x' + k] - c.x, e['z' + k] - c.z) < 0.01) out.push({ el: e, k, x: e['x' + k], z: e['z' + k] });
+  return out;
+}
+
+/* planta: desenho */
+let planQueued = false;
+function drawPlan() {
+  if (!ed.on || ed.view !== 'planta' || planQueued) return;
+  planQueued = true;
+  requestAnimationFrame(() => { planQueued = false; paintPlan(); });
+}
+function paintPlan() {
+  const W = planCv.clientWidth, H = planCv.clientHeight, dpr = Math.min(devicePixelRatio, 2);
+  if (planCv.width !== Math.round(W * dpr) || planCv.height !== Math.round(H * dpr)) { planCv.width = Math.round(W * dpr); planCv.height = Math.round(H * dpr); }
+  const c = pctx, m = M(), lv = ed.level, s = ed.s;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = '#f4f5f6'; c.fillRect(0, 0, W, H);
+  const line = (x0, y0, x1, y1) => { c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); };
+  const [wx0, wz1] = toW(0, 0), [wx1, wz0] = toW(W, H);
+  // grade: linhas da grade de encaixe e linhas de metro
+  c.lineWidth = 1;
+  const gridLines = (g, color) => {
+    c.strokeStyle = color;
+    for (let i = Math.ceil(wx0 / g); i * g <= wx1; i++) { const X = Math.round(toS(i * g, 0)[0]) + 0.5; line(X, 0, X, H); }
+    for (let i = Math.ceil(wz0 / g); i * g <= wz1; i++) { const Y = Math.round(toS(0, i * g)[1]) + 0.5; line(0, Y, W, Y); }
+  };
+  if (ed.snap * s >= 7 && ed.snap < 1) gridLines(ed.snap, '#e8eaec');
+  const major = s >= 22 ? 1 : 5;
+  gridLines(major, '#d4d8dc');
+  c.strokeStyle = '#aab1b8'; { const [X, Y] = toS(0, 0); line(X, 0, X, H); line(0, Y, W, Y); }
+  c.fillStyle = '#8a9097'; c.font = '11px system-ui, sans-serif';
+  for (let i = Math.ceil(wx0 / major); i * major <= wx1; i++) c.fillText(fmt(i * major, 0), toS(i * major, 0)[0] + 3, H - 44);
+  for (let i = Math.ceil(wz0 / major); i * major <= wz1; i++) c.fillText(fmt(i * major, 0), W - 22, toS(0, i * major)[1] - 3);
+
+  const path = pts => { c.beginPath(); pts.forEach(([x, z], i) => { const [X, Y] = toS(x, z); i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.closePath(); };
+  const poly = (pts, fill, stroke, dash, lw = 1) => {
+    path(pts);
+    if (fill) { c.fillStyle = fill; c.fill(); }
+    if (stroke) { c.setLineDash(dash || []); c.lineWidth = lw; c.strokeStyle = stroke; c.stroke(); c.setLineDash([]); }
+  };
+  const segRect = (e, a, b, half) => {
+    const { dx, dz } = segInfo(e), nx = -dz * half, nz = dx * half;
+    const ax = e.x1 + dx * a, az = e.z1 + dz * a, bx = e.x1 + dx * b, bz = e.z1 + dz * b;
+    return [[ax + nx, az + nz], [bx + nx, bz + nz], [bx - nx, bz - nz], [ax - nx, az - nz]];
+  };
+  const rect = r => [[r.x0, r.z0], [r.x1, r.z0], [r.x1, r.z1], [r.x0, r.z1]];
+  const label = (txt, x, z, color = '#5d646b') => { if (s < 28) return; c.fillStyle = color; c.font = '11px system-ui, sans-serif'; const [X, Y] = toS(x, z); c.fillText(txt, X + 4, Y - 4); };
+  const shapeOf = sel => {
+    const e = elOf(sel);
+    if (!e) return null;
+    if (sel.kind === 'column') return rect({ x0: e.x - e.b / 2, x1: e.x + e.b / 2, z0: e.z - e.h / 2, z1: e.z + e.h / 2 });
+    if (sel.kind === 'wall') return segRect(e, 0, segInfo(e).len, e.t / 2);
+    if (sel.kind === 'beam') return segRect(e, 0, segInfo(e).len, e.b / 2);
+    if (sel.kind === 'opening') { const o = e.openings[sel.oi]; return o ? segRect(e, o.pos, o.pos + o.width, e.t / 2 + 0.03) : null; }
+    return rect(e);
+  };
+
+  if (lv <= 0) for (const p of m.pisos) { poly(rect(p), lv === 0 ? 'rgba(214,204,184,0.55)' : 'rgba(214,204,184,0.25)', '#b6aa90'); label(p.id, p.x0, p.z1); }
+  if (lv >= 0) for (const sl of m.slabs.filter(q => q.level === lv + 1)) {
+    const bal = sl.kind === 'balanco';
+    poly(rect(sl), bal ? 'rgba(120,128,136,0.22)' : 'rgba(150,156,162,0.16)', '#8a9096', [6, 4]);
+    if (bal) {   // hachura do balanço
+      c.save(); path(rect(sl)); c.clip(); c.strokeStyle = 'rgba(110,118,126,0.45)'; c.lineWidth = 1;
+      const [X0, Y1] = toS(sl.x0, sl.z0), [X1, Y0] = toS(sl.x1, sl.z1);
+      for (let x = X0 - (Y1 - Y0); x < X1; x += 9) line(x, Y1, x + (Y1 - Y0), Y0);
+      c.restore();
+    }
+    label(sl.id, sl.x0 + 0.05, sl.z1 - 0.3, '#7a8188');
+  }
+  if (lv >= 1) for (const w of m.walls.filter(q => q.level === lv - 1)) poly(segRect(w, 0, segInfo(w).len, w.t / 2), 'rgba(201,138,107,0.18)');
+  for (const b of m.beams.filter(q => q.level === beamLevel())) {
+    poly(segRect(b, 0, segInfo(b).len, b.b / 2), lv < 0 ? '#a7aeb5' : 'rgba(120,128,136,0.12)', '#6d747b', lv < 0 ? null : [5, 3]);
+    label(b.id, (b.x1 + b.x2) / 2, (b.z1 + b.z2) / 2, '#6d747b');
+  }
+  if (lv >= 0) for (const w of m.walls.filter(q => q.level === lv)) {
+    const { dx, dz, len } = segInfo(w), ops = [...(w.openings || [])].sort((a, b) => a.pos - b.pos);
+    let cur = 0;
+    for (const o of ops) { if (o.pos > cur) poly(segRect(w, cur, o.pos, w.t / 2), '#c98a6b', '#8c4f36'); cur = Math.max(cur, o.pos + o.width); }
+    if (cur < len) poly(segRect(w, cur, len, w.t / 2), '#c98a6b', '#8c4f36');
+    for (const o of ops) {
+      c.strokeStyle = '#4b5157'; c.lineWidth = 1;
+      if (o.type === 'janela') {
+        poly(segRect(w, o.pos, o.pos + o.width, w.t / 2), '#dcebf6', '#7d95a8');
+        path(segRect(w, o.pos, o.pos + o.width, 0)); c.stroke();
+      } else {   // porta: folha e arco de abertura
+        const hx = w.x1 + dx * o.pos - dz * w.t / 2, hz = w.z1 + dz * o.pos + dx * w.t / 2;
+        const [HX, HY] = toS(hx, hz), [LX, LY] = toS(hx - dz * o.width, hz + dx * o.width), [EX, EY] = toS(hx + dx * o.width, hz + dz * o.width);
+        line(HX, HY, LX, LY);
+        const a0 = Math.atan2(LY - HY, LX - HX), a1 = Math.atan2(EY - HY, EX - HX);
+        let d = a1 - a0; while (d > PI) d -= 2 * PI; while (d < -PI) d += 2 * PI;
+        c.setLineDash([3, 3]); c.beginPath(); c.arc(HX, HY, o.width * s, a0, a0 + d, d < 0); c.stroke(); c.setLineDash([]);
+      }
+    }
+    label(w.id, (w.x1 + w.x2) / 2 - dz * 0.35 + dx * 0.4, (w.z1 + w.z2) / 2 + dx * 0.35 + dz * 0.4, '#8c4f36');
+  }
+  for (const col of m.columns) {
+    poly(rect({ x0: col.x - col.b / 2, x1: col.x + col.b / 2, z0: col.z - col.h / 2, z1: col.z + col.h / 2 }), '#4b5157');
+    label(col.id, col.x + col.b / 2, col.z + col.h / 2, '#30353a');
+  }
+  // destaque, alças e pré-visualização do desenho
+  if (ed.hover && !(ed.sel && ed.hover.id === ed.sel.id && ed.hover.oi === ed.sel.oi)) { const sh = shapeOf(ed.hover); if (sh) poly(sh, null, 'rgba(47,111,214,0.55)', null, 2); }
+  if (ed.sel) { const sh = shapeOf(ed.sel); if (sh) poly(sh, 'rgba(47,111,214,0.12)', '#2f6fd6', null, 2.5); }
+  for (const h of handlesOf(ed.sel)) { const [X, Y] = toS(h.x, h.z); c.fillStyle = '#fff'; c.strokeStyle = '#2f6fd6'; c.lineWidth = 2; c.fillRect(X - 5, Y - 5, 10, 10); c.strokeRect(X - 5, Y - 5, 10, 10); }
+  const d = ed.drag;
+  if (d && d.type === 'draw') {
+    const e = { x1: d.a[0], z1: d.a[1], x2: d.b[0], z2: d.b[1] }, half = ed.tool === 'wall' ? 0.075 : 0.075;
+    if (Math.hypot(e.x2 - e.x1, e.z2 - e.z1) > 0.01) poly(segRect(e, 0, segInfo(e).len, half), 'rgba(47,111,214,0.25)', '#2f6fd6', [4, 3], 1.5);
+  } else if (d && d.type === 'rect') {
+    poly(rect({ x0: Math.min(d.a[0], d.b[0]), x1: Math.max(d.a[0], d.b[0]), z0: Math.min(d.a[1], d.b[1]), z1: Math.max(d.a[1], d.b[1]) }), 'rgba(47,111,214,0.15)', '#2f6fd6', [4, 3], 1.5);
+  }
+}
+
+/* planta: interação */
+function planXY(ev) { const r = planCv.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; }
+planCv.addEventListener('contextmenu', ev => ev.preventDefault());
+planCv.addEventListener('wheel', ev => {
+  ev.preventDefault();
+  const [px, py] = planXY(ev), [x, z] = toW(px, py);
+  ed.s = clamp(ed.s * Math.exp(-ev.deltaY * 0.0015), 8, 400);
+  ed.ox = px - x * ed.s; ed.oy = py + z * ed.s;
+  drawPlan();
+}, { passive: false });
+planCv.addEventListener('pointerdown', ev => {
+  planCv.setPointerCapture(ev.pointerId);
+  const [px, py] = planXY(ev);
+  if (ev.button === 1 || ev.button === 2) { ed.drag = { type: 'pan', px, py, ox: ed.ox, oy: ed.oy }; return; }
+  if (ev.button !== 0) return;
+  const [x, z] = toW(px, py), m = M(), lv = ed.level, tool = ed.tool;
+  if (tool === 'select') {
+    const h = hitHandle(px, py);
+    if (h) { ed.drag = { type: 'handle', h, snap: snapshot(), moved: false }; return; }
+    ed.sel = ed.hover = hitPlan(x, z); afterSelect();
+    if (ed.sel) {
+      const el = elOf(ed.sel);
+      ed.drag = { type: 'move', x, z, orig: JSON.parse(JSON.stringify(el)), att: ed.sel.kind === 'column' ? attachedTo(el) : [], snap: snapshot(), moved: false };
+    }
+    return;
+  }
+  if (tool === 'delete') { const h = hitPlan(x, z); if (h) { pushUndo(); removeSel(h); } return; }
+  if (tool === 'column') {
+    const [sx, sz] = snapXZ(x, z);
+    if (m.columns.some(c => Math.hypot(c.x - sx, c.z - sz) < 0.15)) return flash('Já existe um pilar neste ponto');
+    pushUndo();
+    const c = { id: newId('P'), x: sx, z: sz, b: 0.2, h: 0.2 };
+    m.columns.push(c); ed.sel = { kind: 'column', id: c.id }; commit();
+    return;
+  }
+  if (tool === 'porta' || tool === 'janela') {
+    if (lv < 0) return flash('Portas e janelas ficam nas paredes: escolha um pavimento');
+    const w = m.walls.find(w => w.level === lv && distPointSeg(x, z, w.x1, w.z1, w.x2, w.z2) <= w.t / 2 + 8 / ed.s);
+    if (!w) return flash('Clique sobre uma parede deste pavimento');
+    const { dx, dz } = segInfo(w);
+    insertOpening(w, tool, (x - w.x1) * dx + (z - w.z1) * dz);
+    return;
+  }
+  if (tool === 'wall' && lv < 0) return flash('Paredes ficam nos pavimentos: escolha Térreo ou outro pavimento');
+  if ((tool === 'slab' || tool === 'cantilever') && lv < 0) return flash('Lajes ficam no teto de um pavimento: escolha um pavimento');
+  if (tool === 'piso' && lv > 0) return flash('O piso cerâmico fica no térreo: escolha Térreo ou Baldrame');
+  const a = snapXZ(x, z, tool === 'wall' || tool === 'beam');
+  ed.drag = { type: tool === 'wall' || tool === 'beam' ? 'draw' : 'rect', a, b: a };
+});
+planCv.addEventListener('pointermove', ev => {
+  const [px, py] = planXY(ev), [x, z] = toW(px, py), d = ed.drag;
+  ed.cur = [x, z];
+  if (!d) {
+    ed.hover = ['select', 'delete', 'porta', 'janela'].includes(ed.tool) ? hitPlan(x, z) : null;
+    planCv.style.cursor = ed.tool === 'select' ? (hitHandle(px, py) ? 'move' : ed.hover ? 'pointer' : 'default') : 'crosshair';
+  } else if (d.type === 'pan') { ed.ox = d.ox + px - d.px; ed.oy = d.oy + py - d.py; }
+  else if (d.type === 'draw') { let b = snapXZ(x, z, true); if (ev.shiftKey) b = ortho(d.a, b); d.b = b; }
+  else if (d.type === 'rect') d.b = snapXZ(x, z);
+  else if (d.type === 'move') moveSel(d, x, z);
+  else if (d.type === 'handle') dragHandle(d, x, z, ev.shiftKey);
+  updateHint(); drawPlan();
+});
+planCv.addEventListener('pointerup', () => {
+  const d = ed.drag; ed.drag = null;
+  if (!d) return;
+  if (d.type === 'draw') finishDraw(d);
+  else if (d.type === 'rect') finishRect(d);
+  else if ((d.type === 'move' || d.type === 'handle') && d.moved) { pushUndo(d.snap); commit(); }
+  else drawPlan();
+  updateHint();
+});
+planCv.addEventListener('pointerleave', () => { ed.cur = null; ed.hover = null; updateHint(); drawPlan(); });
+
+function moveSel(d, x, z) {
+  const g = ed.snap, dx = r3(Math.round((x - d.x) / g) * g), dz = r3(Math.round((z - d.z) / g) * g);
+  if (!dx && !dz && !d.moved) return;
+  d.moved = true;
+  const el = elOf(ed.sel), o = d.orig;
+  switch (ed.sel.kind) {
+    case 'column':
+      el.x = r3(o.x + dx); el.z = r3(o.z + dz);
+      for (const a of d.att) { a.el['x' + a.k] = r3(a.x + dx); a.el['z' + a.k] = r3(a.z + dz); }
+      break;
+    case 'wall': case 'beam':
+      el.x1 = r3(o.x1 + dx); el.x2 = r3(o.x2 + dx); el.z1 = r3(o.z1 + dz); el.z2 = r3(o.z2 + dz);
+      break;
+    case 'slab': case 'piso':
+      el.x0 = r3(o.x0 + dx); el.x1 = r3(o.x1 + dx); el.z0 = r3(o.z0 + dz); el.z1 = r3(o.z1 + dz);
+      break;
+    case 'opening': {
+      const { dx: ux, dz: uz, len } = segInfo(el), op = el.openings[ed.sel.oi];
+      const du = Math.round(((x - d.x) * ux + (z - d.z) * uz) / g) * g;
+      op.pos = r3(clamp(o.openings[ed.sel.oi].pos + du, 0.1, len - op.width - 0.1));
+      break;
+    }
+  }
+}
+function dragHandle(d, x, z, shift) {
+  const el = elOf(ed.sel), h = d.h;
+  if (h.k === 1 || h.k === 2) {
+    let p = snapXZ(x, z, true, el);
+    if (shift) p = ortho(h.k === 1 ? [el.x2, el.z2] : [el.x1, el.z1], p);
+    el['x' + h.k] = p[0]; el['z' + h.k] = p[1];
+  } else {
+    const p = snapXZ(x, z);
+    el[h.ax] = p[0]; el[h.az] = p[1];
+  }
+  d.moved = true;
+}
+function finishDraw(d) {
+  const [x1, z1] = d.a, [x2, z2] = d.b;
+  if (Math.hypot(x2 - x1, z2 - z1) < 0.2) return drawPlan();
+  pushUndo();
+  const m = M();
+  if (ed.tool === 'wall') {
+    const w = { id: newId(`A${ed.level}-`, 2), level: ed.level, x1, z1, x2, z2, t: 0.15, openings: [] };
+    m.walls.push(w); ed.sel = { kind: 'wall', id: w.id };
+  } else {
+    const lvB = beamLevel(), b = { id: newId(`V${lvB}-`, 2), level: lvB, x1, z1, x2, z2, b: 0.15, h: lvB === 0 ? 0.3 : 0.4 };
+    m.beams.push(b); ed.sel = { kind: 'beam', id: b.id };
+  }
+  commit();
+}
+function finishRect(d) {
+  const r = { x0: Math.min(d.a[0], d.b[0]), x1: Math.max(d.a[0], d.b[0]), z0: Math.min(d.a[1], d.b[1]), z1: Math.max(d.a[1], d.b[1]) };
+  if (r.x1 - r.x0 < 0.2 || r.z1 - r.z0 < 0.2) return drawPlan();
+  pushUndo();
+  const m = M();
+  if (ed.tool === 'piso') { const p = { id: newId('PS-'), ...r }; m.pisos.push(p); ed.sel = { kind: 'piso', id: p.id }; }
+  else {
+    const lv = ed.level + 1, bal = ed.tool === 'cantilever';
+    const sl = { id: newId(`${bal ? 'B' : 'L'}${lv}-`), level: lv, kind: bal ? 'balanco' : 'laje', ...r, t: 0.12 };
+    m.slabs.push(sl); ed.sel = { kind: 'slab', id: sl.id };
+  }
+  commit();
+}
+function insertOpening(w, type, u) {
+  const { len } = segInfo(w);
+  const o = type === 'porta' ? { type: 'porta', width: 0.8, height: 2.1, sill: 0 } : { type: 'janela', width: 1.2, height: 1.0, sill: 1.1 };
+  if (o.width > len - 0.3) return flash('A parede é curta demais para esta abertura');
+  o.pos = r3(clamp(Math.round((u - o.width / 2) / ed.snap) * ed.snap, 0.15, len - o.width - 0.15));
+  if ((w.openings || []).some(q => o.pos < q.pos + q.width + 0.1 && q.pos < o.pos + o.width + 0.1)) return flash('Já existe uma abertura nesse trecho da parede');
+  pushUndo();
+  (w.openings ||= []).push(o);
+  ed.sel = { kind: 'opening', id: w.id, oi: w.openings.length - 1 };
+  commit();
+}
+function removeSel(sel) {
+  if (sel.kind === 'opening') elOf(sel).openings.splice(sel.oi, 1);
+  else { const L = listOf(sel.kind); L.splice(L.findIndex(e => e.id === sel.id), 1); }
+  ed.sel = ed.hover = null;
+  commit();
+}
+function copyFloorBelow() {
+  const m = M(), lv = ed.level;
+  if (lv < 1) return;
+  const has = m.walls.some(w => w.level === lv) || m.beams.some(b => b.level === lv + 1) || m.slabs.some(s => s.level === lv + 1);
+  if (has && !confirm('Substituir as paredes, vigas e lajes deste pavimento pelas do pavimento de baixo?')) return;
+  pushUndo();
+  m.walls = m.walls.filter(w => w.level !== lv); m.beams = m.beams.filter(b => b.level !== lv + 1); m.slabs = m.slabs.filter(s => s.level !== lv + 1);
+  const copy = o => JSON.parse(JSON.stringify(o));
+  for (const w of m.walls.filter(w => w.level === lv - 1)) m.walls.push({ ...copy(w), id: newId(`A${lv}-`, 2), level: lv });
+  for (const b of m.beams.filter(b => b.level === lv)) m.beams.push({ ...copy(b), id: newId(`V${lv + 1}-`, 2), level: lv + 1, h: Math.max(b.h, 0.4) });
+  for (const s of m.slabs.filter(s => s.level === lv && s.kind !== 'balanco')) m.slabs.push({ ...copy(s), id: newId(`L${lv + 1}-`), level: lv + 1 });
+  ed.sel = null; commit();
+}
+
+/* vista 3D durante a edição: clique seleciona (ou apaga, com a ferramenta Apagar) */
+function edit3DClick(hit) {
+  const sel = hit ? selFromEntry(hit.object.userData.id) : null;
+  if (ed.tool === 'delete' && sel) { pushUndo(); removeSel(sel); return; }
+  ed.sel = sel; afterSelect();
+}
+
+/* painel de propriedades */
+function renderEditPanel() {
+  if (!ed.on) return;
+  const m = M(), sel = ed.sel, el = elOf(sel);
+  const num = (k, v, step = 0.05, attr = 'data-f') => `<input type="number" ${attr}="${k}" value="${+(+v).toFixed(3)}" step="${step}">`;
+  const opts = (k, from, to, lab, cur) => { let o = ''; for (let l = from; l <= to; l++) o += `<option value="${l}" ${cur === l ? 'selected' : ''}>${lab(l)}</option>`; return `<select data-f="${k}">${o}</select>`; };
+  const coords = (a, b) => a.map(k => `<span>${k} (m)</span>${num(k, el[k])}`).join('') + (b || '');
+  let h = `<h3>Modelo</h3><div class="form">
+    <span>Nome</span><input data-m="name" value="${esc(m.name || '')}">
+    <span>Pavimentos</span><input type="number" data-m="floors" min="1" max="6" step="1" value="${m.floors}">
+    <span>Pé-direito (m)</span><input type="number" data-m="pd" min="2.2" max="5" step="0.05" value="${m.pd}">
+    <span>Grade</span><select data-m="snap">${[0.05, 0.1, 0.2, 0.25, 0.5, 1].map(g => `<option value="${g}" ${g === ed.snap ? 'selected' : ''}>${fmt(g * 100, 0)} cm</option>`).join('')}</select>
+  </div>
+  <div class="btnrow"><button data-cmd="undo" ${ed.undo.length ? '' : 'disabled'}>Desfazer</button><button data-cmd="redo" ${ed.redo.length ? '' : 'disabled'}>Refazer</button>
+    ${ed.level >= 1 ? '<button data-cmd="copy" title="Copia paredes, vigas e lajes do pavimento de baixo para este">Copiar pavimento de baixo</button>' : ''}</div>
+  <div class="btnrow"><button data-cmd="blank">Novo em branco</button><button data-cmd="example">Carregar exemplo</button><button data-cmd="fit">Enquadrar planta</button></div>
+  <h3>Selecionado</h3>`;
+  if (!el) {
+    h += `<p class="hint">Escolha uma ferramenta na barra sobre a planta e desenhe. Com <b>Selecionar</b>, clique num elemento para editar as medidas aqui, arraste para mover e use as alças para redimensionar. Botão direito arrasta a planta; a roda dá zoom.</p>`;
+  } else {
+    let f = '', title = el.id, tag = KIND_LABEL[sel.kind];
+    switch (sel.kind) {
+      case 'column':
+        f = `<span>Centro x (m)</span>${num('x', el.x)}<span>Centro z (m)</span>${num('z', el.z)}<span>Seção em x (m)</span>${num('b', el.b)}<span>Seção em z (m)</span>${num('h', el.h)}`;
+        break;
+      case 'beam':
+        f = `<span>Nível</span>${opts('level', 0, m.floors, l => l === 0 ? 'Baldrame' : `Teto do ${floorName(l - 1).toLowerCase()}`, el.level)}`
+          + coords(['x1', 'z1', 'x2', 'z2']) + `<span>Largura b (m)</span>${num('b', el.b)}<span>Altura h (m)</span>${num('h', el.h)}`;
+        break;
+      case 'wall':
+        f = `<span>Pavimento</span>${opts('level', 0, m.floors - 1, floorName, el.level)}` + coords(['x1', 'z1', 'x2', 'z2']) + `<span>Espessura (m)</span>${num('t', el.t, 0.01)}`
+          + `<span>Tela / ferro-cabelo</span><input type="checkbox" data-b="tela" ${el.tela !== false ? 'checked' : ''} style="width:auto">`
+          + `<span>Cerâmica</span><input type="checkbox" data-b="ceramica" ${el.ceramica ? 'checked' : ''} style="width:auto">`;
+        break;
+      case 'slab':
+        tag = el.kind === 'balanco' ? 'Balanço' : 'Laje';
+        f = `<span>Tipo</span><select data-f="kind"><option value="laje" ${el.kind !== 'balanco' ? 'selected' : ''}>Laje</option><option value="balanco" ${el.kind === 'balanco' ? 'selected' : ''}>Balanço</option></select>`
+          + `<span>Nível</span>${opts('level', 1, m.floors, l => `Teto do ${floorName(l - 1).toLowerCase()} (${fmt(l * m.pd)} m)`, el.level)}`
+          + coords(['x0', 'z0', 'x1', 'z1']) + `<span>Espessura (m)</span>${num('t', el.t, 0.01)}`;
+        break;
+      case 'piso':
+        f = coords(['x0', 'z0', 'x1', 'z1']);
+        break;
+      case 'opening': {
+        const o = el.openings[sel.oi];
+        tag = o.type === 'porta' ? 'Porta' : 'Janela'; title = `em ${el.id}`;
+        f = `<span>Tipo</span><select data-o="type"><option value="porta" ${o.type === 'porta' ? 'selected' : ''}>Porta</option><option value="janela" ${o.type === 'janela' ? 'selected' : ''}>Janela</option></select>`
+          + `<span>Início (m)</span>${num('pos', o.pos, 0.05, 'data-o')}<span>Largura (m)</span>${num('width', o.width, 0.05, 'data-o')}<span>Altura (m)</span>${num('height', o.height, 0.05, 'data-o')}`
+          + (o.type === 'janela' ? `<span>Peitoril (m)</span>${num('sill', o.sill, 0.05, 'data-o')}` : '');
+        break;
+      }
+    }
+    h += `<div class="selhead"><span class="tag">${tag}</span><h2>${esc(title)}</h2></div><div class="form">${f}</div>`;
+    if (sel.kind === 'wall') {
+      h += `<div class="oplist">${(el.openings || []).map((o, i) => `<button data-op="${i}">${o.type === 'porta' ? 'Porta' : 'Janela'} · ${fmt(o.width)} m, a ${fmt(o.pos)} m do início</button>`).join('')}</div>
+        <div class="btnrow"><button data-cmd="addPorta">+ Porta</button><button data-cmd="addJanela">+ Janela</button></div>`;
+    }
+    h += `<div class="btnrow"><button class="danger" data-cmd="del">Apagar ${sel.kind === 'opening' ? 'abertura' : 'elemento'}</button></div>`;
+  }
+  $('#editBox').innerHTML = h;
+}
+$('#editBox').addEventListener('change', ev => {
+  const t = ev.target, ds = t.dataset, m = M();
+  if (ds.m) {
+    if (ds.m === 'snap') { ed.snap = +t.value; drawPlan(); return; }
+    if (ds.m !== 'name' && !isFinite(+t.value)) return renderEditPanel();
+    pushUndo();
+    m[ds.m] = ds.m === 'name' ? t.value : +t.value;
+    if (ds.m === 'floors') {
+      const n = clamp(Math.round(+t.value) || 1, 1, 6), lost = m.walls.some(w => w.level >= n) || m.slabs.some(s => s.level > n) || m.beams.some(b => b.level > n);
+      if (lost && !confirm('Reduzir os pavimentos apaga paredes, vigas e lajes dos pavimentos removidos. Continuar?')) { ed.undo.pop(); return renderEditPanel(); }
+      ed.level = Math.min(ed.level, n - 1);
+    }
+    commit(); syncLevels();
+    return;
+  }
+  const el = elOf(ed.sel);
+  if (!el) return;
+  if (ds.b) { pushUndo(); el[ds.b] = t.checked; return commit(); }
+  const v = ds.f === 'kind' || ds.o === 'type' ? t.value : +t.value;
+  if (typeof v === 'number' && !isFinite(v)) return renderEditPanel();
+  pushUndo();
+  if (ds.f) {
+    el[ds.f] = v;
+    // ao trocar o nível, a planta passa a mostrar o pavimento do elemento
+    if (ds.f === 'level') { ed.level = ed.sel.kind === 'wall' ? v : v - 1; syncLevels(); }
+  }
+  if (ds.o) { const o = el.openings[ed.sel.oi]; o[ds.o] = v; if (ds.o === 'type' && v === 'porta') { o.sill = 0; o.height = Math.max(o.height, 2.1); } }
+  commit();
+});
+$('#editBox').addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  if (b.dataset.op) { ed.sel = { kind: 'opening', id: ed.sel.id, oi: +b.dataset.op }; afterSelect(); return; }
+  switch (b.dataset.cmd) {
+    case 'undo': undo(); break;
+    case 'redo': redo(); break;
+    case 'copy': copyFloorBelow(); break;
+    case 'fit': fitPlan(); drawPlan(); break;
+    case 'del': if (ed.sel) { pushUndo(); removeSel(ed.sel); } break;
+    case 'addPorta': case 'addJanela': { const w = elOf(ed.sel); insertOpening(w, b.dataset.cmd === 'addPorta' ? 'porta' : 'janela', segInfo(w).len / 2); break; }
+    case 'blank': case 'example':
+      if (!confirm(b.dataset.cmd === 'blank' ? 'Começar um modelo em branco? (dá para desfazer)' : 'Carregar o sobrado de exemplo? (dá para desfazer)')) return;
+      pushUndo();
+      state.model = b.dataset.cmd === 'blank'
+        ? { name: 'Novo modelo', floors: 1, pd: 2.8, vinculo: 'hiperestatica', columns: [], beams: [], slabs: [], walls: [], pisos: [] }
+        : exampleModel();
+      ed.sel = null; ed.level = 0; commit(); syncLevels(); fitPlan(); drawPlan(); homeView();
+      break;
+  }
+});
+
+/* barra de ferramentas, troca de vista e entrada/saída do modo */
+function syncLevels() {
+  const m = M();
+  let o = '<option value="-1">Baldrame (fundação)</option>';
+  for (let l = 0; l < m.floors; l++) o += `<option value="${l}">${floorName(l)}</option>`;
+  $('#edLevel').innerHTML = o; $('#edLevel').value = ed.level;
+}
+function setTool(t) {
+  ed.tool = t;
+  for (const b of document.querySelectorAll('#edbar [data-tool]')) b.classList.toggle('on', b.dataset.tool === t);
+  updateHint();
+}
+function setView(v) {
+  ed.view = v;
+  document.body.classList.toggle('planta', ed.on && v === 'planta');
+  for (const b of document.querySelectorAll('#edbar [data-view]')) b.classList.toggle('on', b.dataset.view === v);
+  updateHint(); drawPlan();
+}
+function setEdit(on) {
+  ed.on = on;
+  document.body.classList.toggle('editing', on);
+  $('#bEdit').classList.toggle('on', on);
+  $('#bEdit').textContent = on ? 'Concluir edição' : 'Editar modelo';
+  $('#bKnock').disabled = $('#bReset').disabled = on;
+  if (on) {
+    if (state.percussao) $('#bKnock').click();
+    state.scen = []; state.marks.clear(); regen(); needDeform = true;   // a edição parte do modelo sem cenários
+    for (const e of entries.values()) if (hasCeramic(e)) redraw(e);
+    ed.sel = ed.hover = null; ed.undo = []; ed.redo = []; ed.level = Math.min(ed.level, M().floors - 1);
+    syncLevels(); setTool(ed.tool); setView(ed.view); fitPlan(); renderEditPanel(); drawPlan();
+  } else {
+    ed.drag = null; document.body.classList.remove('planta');
+    state.sel = null; paintHighlight(); renderPanel();
+  }
+}
+$('#bEdit').addEventListener('click', () => setEdit(!ed.on));
+$('#edbar').addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  if (b.dataset.tool) setTool(b.dataset.tool);
+  if (b.dataset.view) setView(b.dataset.view);
+});
+$('#edLevel').addEventListener('change', ev => { ed.level = +ev.target.value; ed.sel = ed.hover = null; afterSelect(); });
+addEventListener('keydown', ev => {
+  if (!ed.on || /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+  const k = ev.key.toLowerCase();
+  if ((ev.ctrlKey || ev.metaKey) && k === 'z') { ev.preventDefault(); ev.shiftKey ? redo() : undo(); return; }
+  if ((ev.ctrlKey || ev.metaKey) && k === 'y') { ev.preventDefault(); redo(); return; }
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  if ((ev.key === 'Delete' || ev.key === 'Backspace') && ed.sel) { ev.preventDefault(); pushUndo(); removeSel(ed.sel); return; }
+  if (ev.key === 'Escape') { ed.drag = null; ed.sel = null; afterSelect(); return; }
+  if (KEYS[k]) setTool(KEYS[k]);
+});
+
+/* ---------- laço principal ---------- */
+function resize() {
+  const w = vp.clientWidth, h = vp.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  drawPlan();
+}
+new ResizeObserver(resize).observe(vp);
+
+let last = performance.now();
+const DUR = 2.4;
+function tick(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const moving = new Set();
+  for (const s of state.scen) if (s.t < 1) { s.t = Math.min(1, s.t + dt / DUR); moving.add(s.id); }
+  if (moving.size || needDeform) { applyDeformation(); needDeform = false; }
+  if (moving.size) for (const id of crackedIds) {
+    const e = entries.get(id);
+    for (const sid of moving) if (e.scenIds.has(sid)) { redraw(e); break; }
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+buildScene(exampleModel());
+resize(); homeView(); renderPanel();
+requestAnimationFrame(tick);
+window.__sim = { state, entries, toggleScenario, camera, controls, redraw, applyDeformation, ed, toS, afterSelect };
+</script>
+</body>
+</html>
